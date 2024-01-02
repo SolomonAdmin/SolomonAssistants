@@ -1,0 +1,8 @@
+openai
+yfinance
+fastapi
+uvicorn
+asyncio
+pydantic
+python-dotenv
+httpx

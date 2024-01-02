@@ -1,0 +1,24 @@
+# Ignore virtual environments
+venv/
+env/
+
+# Ignore Python compiled files
+*.pyc
+__pycache__/
+
+# Ignore development files
+.vscode/
+.idea/
+
+# Ignore log files
+*.log
+
+# Ignore Git and version control
+.git/
+.gitignore
+
+# Ignore temporary files
+tmp/
+.DS_Store
+
+# Other specific files/directories not required in the build
