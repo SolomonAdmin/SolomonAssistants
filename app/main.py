@@ -73,6 +73,17 @@ async def run_assistant(thread_id: str, assistant_id: str, content: str):
         role="user",
         content=content
     )
+    
+@app.post("/list_assistants/")
+async def list_assistants():
+    try:
+        my_assistants = await asyncio.to_thread(
+            client.beta.assistants.list,
+            order="desc"
+        )
+        return {"assistants": my_assistants.data}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
     # Run the assistant in a thread pool
     run = await asyncio.to_thread(
