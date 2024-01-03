@@ -5,18 +5,18 @@ import requests
 import asyncio
 import json
 import os 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File
 from pydantic import BaseModel
 import logging
+from typing import List, Optional
 
 import boto3
 from botocore.exceptions import NoCredentialsError
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Query
 import asyncio
 import json
 
-from typing import Union, Optional
 from dotenv import load_dotenv
 
 import sys
@@ -78,16 +78,36 @@ async def list_assistants():
         return {"assistants": my_assistants.data}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    
+@app.post("/upload_file_for_assistants")
+async def upload_for_finetuning(file: UploadFile = File(...)):
+    try:
+        # Read file content
+        file_content = await file.read()
+
+        # Upload the file to OpenAI
+        response = await asyncio.to_thread(
+            client.files.create,
+            file=file_content,
+            purpose="assistants"
+        )
+
+        return {"message": "File uploaded successfully", "response": response}
+
+    except Exception as e:
+        logging.error(f"Error uploading file: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 # POST endpoint to run assistant with a thread
 @app.post("/run-assistant/")
-async def run_assistant(thread_id: str, assistant_id: str, content: str):
+async def run_assistant(thread_id: str, assistant_id: str, content: str, file_ids: Optional[List[str]] = Query(default=None)):
     # Add a message to a thread in a thread pool
     message = await asyncio.to_thread(
         client.beta.threads.messages.create,
         thread_id=thread_id,
         role="user",
-        content=content
+        content=content,
+        file_ids=file_ids if file_ids else []
     )
 
     # Run the assistant in a thread pool
