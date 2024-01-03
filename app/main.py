@@ -9,6 +9,9 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import logging
 
+import boto3
+from botocore.exceptions import NoCredentialsError
+
 from fastapi import FastAPI
 import asyncio
 import json
@@ -64,16 +67,7 @@ async def create_thread():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/run-assistant/")
-async def run_assistant(thread_id: str, assistant_id: str, content: str):
-    # Add a message to a thread in a thread pool
-    message = await asyncio.to_thread(
-        client.beta.threads.messages.create,
-        thread_id=thread_id,
-        role="user",
-        content=content
-    )
-    
+# POST endpoint to list assistants
 @app.post("/list_assistants/")
 async def list_assistants():
     try:
@@ -84,6 +78,17 @@ async def list_assistants():
         return {"assistants": my_assistants.data}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+# POST endpoint to run assistant with a thread
+@app.post("/run-assistant/")
+async def run_assistant(thread_id: str, assistant_id: str, content: str):
+    # Add a message to a thread in a thread pool
+    message = await asyncio.to_thread(
+        client.beta.threads.messages.create,
+        thread_id=thread_id,
+        role="user",
+        content=content
+    )
 
     # Run the assistant in a thread pool
     run = await asyncio.to_thread(

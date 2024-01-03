@@ -6,3 +6,4 @@ asyncio
 pydantic
 python-dotenv
 httpx
+boto3

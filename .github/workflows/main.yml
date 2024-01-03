@@ -12,6 +12,14 @@ jobs:
     steps:
     - name: Check out code
       uses: actions/checkout@v2
+    
+    - name: Build and Push Docker image
+      run: |
+        docker build --build-arg API_KEY_1=${{ secrets.API_KEY_1 }} --build-arg API_KEY_2=${{ secrets.API_KEY_2 }} -t image-name:tag .
+        # Push to Docker registry commands
+      env:
+        API_KEY_1: ${{ secrets.API_KEY_1 }}
+        API_KEY_2: ${{ secrets.API_KEY_2 }}
 
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v1
