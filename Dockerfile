@@ -8,7 +8,6 @@ WORKDIR /app
 COPY ./app /app/app
 COPY ./tools /app/tools
 COPY tools_config.py requirements.txt /app/
-COPY .env /app/
 
 # Install any needed packages specified in requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
