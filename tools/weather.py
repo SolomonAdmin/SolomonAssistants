@@ -1,11 +1,8 @@
 import os
 import requests
-from dotenv import load_dotenv
+from helpers import get_secret_value
 
-# Load .env file if exists
-load_dotenv()
-
-WEATHER_API_KEY = os.getenv("WEATHER_API_KEY")
+WEATHER_API_KEY = get_secret_value("WEATHER_API_KEY")
 
 def get_weather_data(location: str) -> dict:
     """

@@ -10,28 +10,23 @@ from pydantic import BaseModel
 import logging
 from typing import List, Optional
 
-import boto3
-from botocore.exceptions import NoCredentialsError
-
 from fastapi import FastAPI, Query
 import asyncio
 import json
 
-from dotenv import load_dotenv
-
 import sys
 from pathlib import Path
-
-# Load .env file if exists
-load_dotenv()
 
 # Add the parent directory to sys.path to make 'tools' module discoverable
 sys.path.append(str(Path(__file__).parent.parent))
 
 from tools import get_stock_price, get_weather_data
+from helpers import get_secret_value
+
 from tools_config import tools_list
 
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+# Set the API key as an environment variable
+os.environ["OPENAI_API_KEY"] = get_secret_value("OPENAI_API_KEY")
 
 # Initialize the FastAPI client
 app = FastAPI()
