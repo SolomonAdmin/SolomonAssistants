@@ -13,14 +13,10 @@ jobs:
     - name: Check out code
       uses: actions/checkout@v2
     
-    - name: Build and Push Docker image
+    - name: Build Docker image
       run: |
-        docker build --build-arg API_KEY_1=${{ secrets.API_KEY_1 }} --build-arg API_KEY_2=${{ secrets.API_KEY_2 }} -t image-name:tag .
-        # Push to Docker registry commands
-      env:
-        API_KEY_1: ${{ secrets.API_KEY_1 }}
-        API_KEY_2: ${{ secrets.API_KEY_2 }}
-
+        docker build -t image-name:tag .
+    
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v1
       with:
@@ -32,11 +28,11 @@ jobs:
       id: login-ecr
       uses: aws-actions/amazon-ecr-login@v1
 
-    - name: Build, tag, and push image to Amazon ECR
+    - name: Tag and push image to Amazon ECR
       env:
         ECR_REGISTRY: 215555180754.dkr.ecr.us-east-1.amazonaws.com
         ECR_REPOSITORY: solomonassistantsapp
         IMAGE_TAG: ${{ github.sha }}
       run: |
-        docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+        docker tag image-name:tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
         docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
