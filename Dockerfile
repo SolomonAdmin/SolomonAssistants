@@ -4,10 +4,12 @@ FROM python:3.9-slim
 # Set the working directory in the container
 WORKDIR /app
 
-# Copy the current directory contents into the container at /app
+# Copy the application and other necessary files
 COPY ./app /app/app
 COPY ./tools /app/tools
+COPY ./helpers /app/helpers
 COPY tools_config.py requirements.txt /app/
+
 
 # Install any needed packages specified in requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt

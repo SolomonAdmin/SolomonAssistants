@@ -1,6 +1,8 @@
 # Ignore virtual environments
 venv/
 env/
+.aws/
+node_modules/
 
 # Ignore Python compiled files
 *.pyc

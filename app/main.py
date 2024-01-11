@@ -21,7 +21,7 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent))
 
 from tools import get_stock_price, get_weather_data
-from helpers import get_secret_value
+from helpers.aws_helpers import get_secret_value
 
 from tools_config import tools_list
 
@@ -75,7 +75,7 @@ async def list_assistants():
         raise HTTPException(status_code=500, detail=str(e))
     
 @app.post("/upload_file_for_assistants")
-async def upload_for_finetuning(file: UploadFile = File(...)):
+async def upload_file_for_assistants(file: UploadFile = File(...)):
     try:
         # Read file content
         file_content = await file.read()

@@ -1,0 +1,21 @@
+{
+    "cluster": "client1",
+    "serviceName": "solomon-assistants-service",
+    "taskDefinition": "client1-task-def:1",
+    "loadBalancers": [
+        {
+            "targetGroupArn": "arn:aws:elasticloadbalancing:us-east-1:215555180754:targetgroup/client1alb-target1/89664e725a08e7d1",
+            "containerName": "solomon-assistants-app",
+            "containerPort": 80
+        }
+    ],
+    "launchType": "FARGATE",
+    "desiredCount": 1,
+    "networkConfiguration": {
+        "awsvpcConfiguration": {
+            "assignPublicIp": "ENABLED",
+            "securityGroups": [ "sg-0e17a4185f1832374" ],
+            "subnets": [ "subnet-770f4328", "subnet-da4b5897" ]
+        }
+    }
+}
