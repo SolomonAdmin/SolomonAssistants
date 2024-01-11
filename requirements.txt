@@ -8,3 +8,4 @@ python-dotenv
 httpx
 boto3
 botocore
+python-multipart
