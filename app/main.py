@@ -8,7 +8,7 @@ import os
 from fastapi import FastAPI, HTTPException, UploadFile, File
 from pydantic import BaseModel
 import logging
-from typing import List, Optional
+from typing import List, Optional, Dict
 
 from fastapi import FastAPI, Query
 import asyncio
@@ -35,18 +35,23 @@ app = FastAPI()
 client = openai.OpenAI()
 
 class AssistantData(BaseModel):
-    name: str
-    instructions: str
+    model: str = "gpt-4-1106-preview"
+    name: Optional[str] = None
+    description: Optional[str] = None
+    instructions: Optional[str] = None
+    tools: Optional[List[str]] = []
+    file_ids: Optional[List[str]] = []
+    metadata: Optional[Dict[str, str]] = {}
 
 @app.post("/create_assistant")
 async def create_assistant(assistant_data: AssistantData):
     try:
-        logging.info(f"Creating assistant with name: {assistant_data.name} and instructions: {assistant_data.instructions}")
+        logging.info(f"Creating assistant with model: {assistant_data.model}")
         assistant = client.beta.assistants.create(
             name=assistant_data.name,
             instructions=assistant_data.instructions,
-            tools=tools_list,
-            model="gpt-4-1106-preview",
+            tools=assistant_data.tools or tools_list, 
+            model=assistant_data.model,  # Use the model from the request data
         )
         return {"message": "Assistant created successfully", "assistant": assistant}
     except Exception as e:
@@ -109,8 +114,7 @@ async def run_assistant(thread_id: str, assistant_id: str, content: str, file_id
     run = await asyncio.to_thread(
         client.beta.threads.runs.create,
         thread_id=thread_id,
-        assistant_id=assistant_id,
-        instructions="Please address the user."
+        assistant_id=assistant_id
     )
 
     # Check run status
