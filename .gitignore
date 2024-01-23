@@ -13,6 +13,7 @@ __pycache__/
 
 # Ignore local configuration files
 .env
+aws_configs/*
 
 # Ignore build outputs
 dist/
