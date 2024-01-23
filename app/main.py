@@ -19,7 +19,10 @@ from pathlib import Path
 # Add the parent directory to sys.path to make 'tools' module discoverable
 sys.path.append(str(Path(__file__).parent.parent))
 
-from assistants_tools import get_weather_data
+
+from assistant_tools import get_stock_price, get_weather_data
+from assistant_tools.jiraAgent import jira_run_agent_query
+
 from helpers.aws_helpers import get_secret_value
 
 from tools_config import tools_list
@@ -155,6 +158,13 @@ async def run_assistant(thread_id: str, assistant_id: str, content: str, file_id
                         location=arguments['location']
                     )
                     output = json.dumps(output)  # Convert dictionary to JSON string
+                elif func_name == "jira_run_agent_query":
+                    # Run synchronous function in a thread pool
+                    output = await asyncio.to_thread(
+                        jira_run_agent_query,
+                        jira_query=arguments['jira_query']
+                    )
+                    output = json.dumps(output)  # Convert dictionary to JSON string, if necessary
                 else:
                     raise ValueError(f"Unknown function: {func_name}")
 
