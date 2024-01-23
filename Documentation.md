@@ -68,7 +68,7 @@ docker build -t solomonassistantsapp .
 ```
 ```
 # You can see if the image built successfully now
-docker iamges
+docker images
 ```
 ```
 # The application is exposed on Port 80. We also pass in the AWS credentials to access our other API keys stored in AWS Secrets

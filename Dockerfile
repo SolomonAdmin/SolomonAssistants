@@ -6,7 +6,7 @@ WORKDIR /app
 
 # Copy the application and other necessary files
 COPY ./app /app/app
-COPY ./tools /app/tools
+COPY ./assistant_tools /app/assistant_tools
 COPY ./helpers /app/helpers
 COPY tools_config.py requirements.txt /app/
 
