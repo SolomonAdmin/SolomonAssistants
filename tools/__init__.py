@@ -2,3 +2,4 @@
 
 from .stock import get_stock_price
 from .weather import get_weather_data
+from . import jiraAgent

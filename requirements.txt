@@ -9,3 +9,6 @@ httpx
 boto3
 botocore
 python-multipart
+langchain
+atlassian-python-api
+langchain_openai
