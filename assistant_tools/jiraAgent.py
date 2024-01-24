@@ -31,10 +31,3 @@ def jira_run_agent_query(jira_query):
     )
 
     return agent.run(jira_query)
-
-# # Example usage
-# response  = jira_run_agent_query("Tell me about issue SIMON-2802.")
-# print(response)
-
-# os.environ["JIRA_API_TOKEN"] = "ATATT3xFfGF0fv8gfMqaK3bAMgX2fCmvin2PTdftjMFgLu7ffa5lMMqMOv1F_hDXTbMtuZIghMhS9teKtJLB2IqwsS3L74wz9v5VBSwfbqznS1cBH7_uQPLHwnCGS7tXVPXsGXW3ZBTvLImhWI--fDsrFeLf_PnLNrSB-zQ9atZICUOEwxmEWNY=42A7C9E1"
-# os.environ["OPENAI_API_KEY"] = "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"
