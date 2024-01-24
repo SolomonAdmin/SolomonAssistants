@@ -84,12 +84,14 @@ cd app
 uvicorn main:app --reload  
 ```
 # Docker
+First, change to the root directory 
+```cd ~/SolomonAssistants
 ```
-# Build the docker image called "solomonassistantsapp"
+Build the docker image called "solomonassistantsapp"
 docker build -t solomonassistantsapp .
 ```
 ```
-# You can see if the image built successfully now
+You can see if the image built successfully now
 docker images
 ```
 ```
