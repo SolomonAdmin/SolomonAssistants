@@ -41,6 +41,28 @@ ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDbEahW/yLYX1QrR8pXtTRIGB1A9RQpV9EruL4jmPwZ
 - Click Add SSH key.
 - Test your connection, ```ssh -T git@github.com```
 
+Check the SSH Configuration
+```
+ssh-add -l
+```
+If it is not added
+```
+ssh-add ~/.ssh/solomonkey
+```
+
+Test the connection
+```
+ssh -T git@github-SolomonAdmin
+```
+Ensure correct remote URL
+```
+git remote -v
+```
+If it's not using github with solomon ley
+```
+git remote set-url origin github-SolomonAdmin:SolomonAdmin/SolomonAssistants.git
+```
+
 ## Install brew
 
 ## Clone the repo
