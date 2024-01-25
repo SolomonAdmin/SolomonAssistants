@@ -10,7 +10,7 @@ env:
   ECS_SERVICE: solomonassistantsapp3
   ECS_CLUSTER: sap
   ECS_TASK_DEFINITION: .aws/task-definition.json
-  CONTAINER_NAME: solomonassistantsapp
+  CONTAINER_NAME: solomonassistantsapp3
 
 permissions:
   contents: read
