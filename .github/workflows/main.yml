@@ -58,6 +58,8 @@ jobs:
     - name: Echo Rendered Task Definition
       run: |
         echo "Rendered Task Definition: ${{ steps.task-def.outputs.task-definition }}"
+        echo "Service: ${{ env.ECS_SERVICE }}"
+        echo "Cluster: ${{ env.ECS_CLUSTER }}"
 
     - name: Deploy Amazon ECS task definition
       uses: aws-actions/amazon-ecs-deploy-task-definition@v1
