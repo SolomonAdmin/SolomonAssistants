@@ -7,7 +7,7 @@ on:
 env:
   AWS_REGION: us-east-1
   ECR_REPOSITORY: solomonassistantsapp
-  ECS_SERVICE: sap
+  ECS_SERVICE: sap2-sap
   ECS_CLUSTER: sap2
   ECS_TASK_DEFINITION: .aws/task-definition.json
   CONTAINER_NAME: sap
@@ -69,6 +69,12 @@ jobs:
           echo "ECS_SERVICE=$ECS_SERVICE" >> $GITHUB_ENV
         fi
 
+    - name: Debug Before Deployment
+      run: |
+        echo "Service: ${{ env.ECS_SERVICE }}"
+        echo "Cluster: ${{ env.ECS_CLUSTER }}"
+        echo "Task Definition: ${{ steps.task-def.outputs.task-definition }}"
+        
     - name: Deploy Amazon ECS task definition
       uses: aws-actions/amazon-ecs-deploy-task-definition@v1
       with:
@@ -77,8 +83,4 @@ jobs:
         cluster: ${{ env.ECS_CLUSTER }}
         wait-for-service-stability: true
 
-    - name: Debug Before Deployment
-      run: |
-        echo "Service: ${{ env.ECS_SERVICE }}"
-        echo "Cluster: ${{ env.ECS_CLUSTER }}"
-        echo "Task Definition: ${{ steps.task-def.outputs.task-definition }}"
+    
