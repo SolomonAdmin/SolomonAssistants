@@ -33,7 +33,7 @@ os.environ["OPENAI_API_KEY"] = get_secret_value("OPENAI_API_KEY")
 # Initialize the FastAPI client
 app = FastAPI()
 
-# Initialize the OpenAI client
+# Initialize the OpenAI client comment
 client = openai.OpenAI()
 
 class AssistantData(BaseModel):
