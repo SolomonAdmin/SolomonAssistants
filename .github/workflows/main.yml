@@ -7,10 +7,10 @@ on:
 env:
   AWS_REGION: us-east-1
   ECR_REPOSITORY: solomonassistantsapp
-  ECS_SERVICE: sap
-  ECS_CLUSTER: sap2
+  ECS_SERVICE: sap               
+  ECS_CLUSTER: sap2              
   ECS_TASK_DEFINITION: .aws/task-definition.json
-  CONTAINER_NAME: sap
+  CONTAINER_NAME: solomonassistantsapp3
 
 permissions:
   contents: read
