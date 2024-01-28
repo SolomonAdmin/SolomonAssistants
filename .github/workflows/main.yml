@@ -61,6 +61,14 @@ jobs:
         echo "Service: ${{ env.ECS_SERVICE }}"
         echo "Cluster: ${{ env.ECS_CLUSTER }}"
 
+    - name: Adjust Service Name
+      run: |
+        if [[ $ECS_SERVICE == AppECS-* ]]; then
+          ECS_SERVICE=${ECS_SERVICE#AppECS-}
+          echo "Adjusted ECS_SERVICE to $ECS_SERVICE"
+          echo "ECS_SERVICE=$ECS_SERVICE" >> $GITHUB_ENV
+        fi
+
     - name: Deploy Amazon ECS task definition
       uses: aws-actions/amazon-ecs-deploy-task-definition@v1
       with:
