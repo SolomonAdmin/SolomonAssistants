@@ -6,7 +6,7 @@ import asyncio
 import json
 import os 
 from fastapi import FastAPI, HTTPException, UploadFile, File
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 import logging
 from typing import List, Optional, Dict
 
@@ -106,7 +106,6 @@ class ModifyAssistantRequest(BaseModel):
     tools: list = None
     model: str = None
     file_ids: list = None
-
 @app.post("/modify_assistant/{assistant_id}")
 async def modify_assistant(assistant_id: str, request: ModifyAssistantRequest = None):
     try:
@@ -121,6 +120,79 @@ async def modify_assistant(assistant_id: str, request: ModifyAssistantRequest = 
             file_ids=request.file_ids
         )
         return {"message": "Assistant modified successfully", "assistant": my_updated_assistant}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+@app.delete("/delete_assistant/{assistant_id}")
+async def delete_assistant(assistant_id: str):
+    try:
+        response = await asyncio.to_thread(
+            client.beta.assistants.delete,
+            assistant_id
+        )
+        return {"message": "Assistant deleted successfully", "response": response}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+@app.delete("/delete_assistant_file/{assistant_id}/{file_id}")
+async def delete_assistant_file(assistant_id: str, file_id: str):
+    try:
+        deleted_assistant_file = await asyncio.to_thread(
+            client.beta.assistants.files.delete,
+            assistant_id=assistant_id,
+            file_id=file_id
+        )
+        return {"message": "Assistant file deleted successfully", "response": deleted_assistant_file}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+@app.get("/retrieve_thread/{thread_id}")
+async def retrieve_thread(thread_id: str):
+    try:
+        my_thread = await asyncio.to_thread(
+            client.beta.threads.retrieve,
+            thread_id
+        )
+        return {"message": "Thread retrieved successfully", "thread": my_thread}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+class ThreadUpdateRequest(BaseModel):
+    metadata: Dict[str, str] = Field(
+        default={},
+        description="Set of key-value pairs for metadata. Keys can be a maximum of 64 characters long and values can be a maximum of 512 characters long."
+    )
+@app.post("/modify_thread/{thread_id}")
+async def modify_thread(thread_id: str, request: ThreadUpdateRequest):
+    try:
+        my_updated_thread = await asyncio.to_thread(
+            client.beta.threads.update,
+            thread_id,
+            metadata=request.metadata
+        )
+        return {"message": "Thread modified successfully", "thread": my_updated_thread}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/delete_thread/{thread_id}")
+async def delete_thread(thread_id: str):
+    try:
+        response = await asyncio.to_thread(
+            client.beta.threads.delete,
+            thread_id
+        )
+        return {"message": "Thread deleted successfully", "response": response}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+@app.get("/retrieve_file/{file_id}")
+async def retrieve_file(file_id: str):
+    try:
+        content = await asyncio.to_thread(
+            client.files.retrieve_content,
+            file_id
+        )
+        return {"message": "File content retrieved successfully", "content": content}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

@@ -96,9 +96,51 @@ docker images
 ```
 ```
 # The application is exposed on Port 80. We also pass in the AWS credentials to access our other API keys stored in AWS Secrets
-docker run -e AWS_ACCESS_KEY_ID=AKIATEMAXBDJFNEYIZ63 \
-           -e AWS_SECRET_ACCESS_KEY=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 \
+docker run -e AWS_ACCESS_KEY_ID=FIND_IN_GITHUB_SECRETS \
+           -e AWS_SECRET_ACCESS_KEY=FIND_IN_GITHUB_SECRETS \
            -e AWS_DEFAULT_REGION=us-east-1 \
            -p 8000:80 \
            solomonassistantsapp
+```
+
+```
+sudo yum install java
+sudo wget -O /etc/yum.repos.d/jenkins.repo \
+    https://pkg.jenkins.io/redhat-stable/jenkins.repo
+sudo rpm --import https://pkg.jenkins.io/redhat-stable/jenkins.io-2023.key
+sudo yum upgrade
+# Add required dependencies for the jenkins package
+sudo yum install fontconfig java-17-openjdk
+sudo yum install jenkins
+sudo systemctl daemon-reload
+
+sudo systemctl enable jenkins
+sudo systemctl status jenkins
+sudo systemctl start jenkins
+
+sudo systemctl status jenkins
+# copy
+/var/lib/jenkins/secrets/initialAdminPassword
+
+sudo cat /var/lib/jenkins/secrets/initialAdminPassword
+# Password: 776900b3c82646fba0882d629bb2091a
+
+curl -fsSL https://get.docker.com -o install-docker.sh
+
+sudo yum install docker
+sudo service docker start
+sudo usermod -a -G docker jenkins
+
+sudo -su jenkins
+whoami # jenkins
+
+cd /var/lib/jenkins/
+mkdir .aws
+
+sudo -su jenkins
+cd /var/lib/jenkins/
+aws configure
+exit
+newgrp
+
 ```
