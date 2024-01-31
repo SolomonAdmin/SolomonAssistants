@@ -99,6 +99,31 @@ async def upload_file_for_assistants(file: UploadFile = File(...)):
     except Exception as e:
         logging.error(f"Error uploading file: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+    
+class ModifyAssistantRequest(BaseModel):
+    name: str = None
+    description: str = None
+    instructions: str = None
+    tools: list = None
+    model: str = None
+    file_ids: list = None
+
+@app.post("/modify_assistant/{assistant_id}")
+async def modify_assistant(assistant_id: str, request: ModifyAssistantRequest = None):
+    try:
+        my_updated_assistant = await asyncio.to_thread(
+            client.beta.assistants.update,
+            assistant_id,
+            name=request.name,
+            description=request.description,
+            instructions=request.instructions,
+            tools=request.tools,
+            model=request.model,
+            file_ids=request.file_ids
+        )
+        return {"message": "Assistant modified successfully", "assistant": my_updated_assistant}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 # POST endpoint to run assistant with a thread
 @app.post("/run-assistant/")
