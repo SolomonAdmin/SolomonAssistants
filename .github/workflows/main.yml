@@ -41,4 +41,5 @@ jobs:
 
     - name: Echo Image URI
       run: |
+
         echo "Image URI: $IMAGE_URI"

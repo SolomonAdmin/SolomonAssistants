@@ -1,6 +1,5 @@
 import openai
 import time
-import yfinance as yf
 import requests
 import asyncio
 import json
@@ -20,8 +19,10 @@ from pathlib import Path
 # Add the parent directory to sys.path to make 'tools' module discoverable
 sys.path.append(str(Path(__file__).parent.parent))
 
+
 from assistant_tools import get_stock_price, get_weather_data
 from assistant_tools.jiraAgent import jira_run_agent_query
+
 from helpers.aws_helpers import get_secret_value
 
 from tools_config import tools_list
