@@ -67,7 +67,7 @@ pipeline {
            echo "\n"
        }
        success{
-           echo "Nothing messed up, Hallelujah!"
+           echo "Deployment completed."
        }
        failure {
            echo "Error: ${errorMessage}"
