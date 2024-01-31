@@ -40,22 +40,25 @@ pipeline {
             steps{
                 script{
                     try{
-                        def sha = sh(script: "aws ecr describe-images --repository-name $REPO --query 'sort_by(imageDetails,& imagePushedAt)[-1].imageTags[0]' --output text", returnStdout: true).trim()
-                        echo "sha is $sha"
-                        sh """aws ecr get-login-password --region $REGION | docker login --username AWS --password-stdin $ECR_URL
-                        docker pull $ECR_URL/$REPO:$sha
-                        echo 'Killing other containers'
-                        docker rm -f \$(docker ps -aq)
-                        docker run -p 80:80 -d $ECR_URL/$REPO:$sha
-                        """
+                        withCredentials([string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'), string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY')]) {
+                            def sha = sh(script: "aws ecr describe-images --repository-name $REPO --query 'sort_by(imageDetails,& imagePushedAt)[-1].imageTags[0]' --output text", returnStdout: true).trim()
+                            echo "sha is $sha"
+                            sh """aws ecr get-login-password --region $REGION | docker login --username AWS --password-stdin $ECR_URL
+                            docker pull $ECR_URL/$REPO:$sha
+                            echo 'Killing other containers'
+                            docker rm -f \$(docker ps -aq)
+                            docker run -p 80:80 -d -e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY $ECR_URL/$REPO:$sha
+                            """
+                    }
                     }catch(exec){
                         errorMessage = "Jenkins Failed during BuildImage stage"
                         sh 'exit 1'
                     }          
-                    
+
+                 }   
                 }
-            }
-        }     
+            
+        }
 
     }
 
