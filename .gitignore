@@ -6,11 +6,11 @@ aws_configs/
 # Ignore Python compiled files
 *.pyc
 __pycache__/
-
+scripts/
 # Ignore logs and temporary files
 *.log
 .DS_Store
-
+*.pem
 # Ignore local configuration files
 .env
 aws_configs/*
