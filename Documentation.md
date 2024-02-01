@@ -143,4 +143,11 @@ aws configure
 exit
 newgrp
 
+connect to ec2
+sudo -su jenkins
+id -nG jenkins
+
+sudo systemctl restart jenkins
+sudo systemctl status jenkins
+
 ```
