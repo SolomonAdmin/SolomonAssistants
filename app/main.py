@@ -102,23 +102,34 @@ async def upload_file_for_assistants(file: UploadFile = File(...)):
         logging.error(f"Error uploading file: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
     
+class Tool(BaseModel):
+    type: str  # Only include the fields that should be sent in the request
+
 class ModifyAssistantRequest(BaseModel):
-    name: str = None
-    description: str = None
-    instructions: str = None
-    tools: list = None
-    model: str = None
-    file_ids: list = None
+    name: Optional[str] = None
+    description: Optional[str] = None
+    instructions: Optional[str] = None
+    tools: List[Tool] = []  # Defaults to an empty list if not provided
+    model: Optional[str] = "gpt-4-1106-preview"  # Default model
+    file_ids: List[str] = []  # Defaults to an empty list if not provided
+    metadata: Optional[Dict[str, str]] = None  # Including metadata as optional
+
 @app.post("/modify_assistant/{assistant_id}")
 async def modify_assistant(assistant_id: str, request: ModifyAssistantRequest = None):
     try:
+        # Convert the list of Tool objects into the expected format for OpenAI API
+        # Here, we assume OpenAI API expects 'tools' to be a list of objects with a 'type' field
+        tools_formatted = [{"type": tool.type} for tool in (request.tools or []) if tool.type in {"code_interpreter", "retrieval", "function"}]
+
+        # Your code to update the assistant
+        # Replace 'client.beta.assistants.update' with the actual call to the OpenAI API
         my_updated_assistant = await asyncio.to_thread(
             client.beta.assistants.update,
             assistant_id,
             name=request.name,
             description=request.description,
             instructions=request.instructions,
-            tools=request.tools,
+            tools=tools_formatted,
             model=request.model,
             file_ids=request.file_ids
         )
