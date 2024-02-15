@@ -102,27 +102,22 @@ async def upload_file_for_assistants(file: UploadFile = File(...)):
         logging.error(f"Error uploading file: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
     
-class Tool(BaseModel):
-    type: str  # Only include the fields that should be sent in the request
-
 class ModifyAssistantRequest(BaseModel):
     name: Optional[str] = None
-    description: Optional[str] = None
-    instructions: Optional[str] = None
-    tools: List[Tool] = []  # Defaults to an empty list if not provided
-    model: Optional[str] = "gpt-4-1106-preview"  # Default model
-    file_ids: List[str] = []  # Defaults to an empty list if not provided
-    metadata: Optional[Dict[str, str]] = None  # Including metadata as optional
+    description: str = ""
+    instructions: str = ""
+    tools: List[str] = []  # This correctly reflects your current model
+    model: str = "gpt-4-1106-preview"
+    file_ids: List[str] = []
+    metadata: Optional[Dict[str, str]] = None
 
 @app.post("/modify_assistant/{assistant_id}")
-async def modify_assistant(assistant_id: str, request: ModifyAssistantRequest = None):
+async def modify_assistant(assistant_id: str, request: ModifyAssistantRequest):
     try:
-        # Convert the list of Tool objects into the expected format for OpenAI API
-        # Here, we assume OpenAI API expects 'tools' to be a list of objects with a 'type' field
-        tools_formatted = [{"type": tool.type} for tool in (request.tools or []) if tool.type in {"code_interpreter", "retrieval", "function"}]
+        # Directly format the tools array from the request strings
+        tools_formatted = [{"type": tool_name} for tool_name in request.tools]
 
-        # Your code to update the assistant
-        # Replace 'client.beta.assistants.update' with the actual call to the OpenAI API
+        # Proceed with updating the assistant
         my_updated_assistant = await asyncio.to_thread(
             client.beta.assistants.update,
             assistant_id,
@@ -131,7 +126,8 @@ async def modify_assistant(assistant_id: str, request: ModifyAssistantRequest = 
             instructions=request.instructions,
             tools=tools_formatted,
             model=request.model,
-            file_ids=request.file_ids
+            file_ids=request.file_ids,
+            metadata=request.metadata
         )
         return {"message": "Assistant modified successfully", "assistant": my_updated_assistant}
     except Exception as e:
