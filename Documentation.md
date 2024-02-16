@@ -151,3 +151,62 @@ sudo systemctl restart jenkins
 sudo systemctl status jenkins
 
 ```
+
+```
+Create EC2 instance (t2.medium)
+OS - Ubuntu
+Solomon2023*
+
+#1
+sudo apt install default-jre
+
+#2 install docker 
+curl -fsSL https://get.docker.com -o get-docker.sh
+sh get-docker.sh
+
+#3 download java runtime env and check install
+sudo apt install openjdk-17-jre-headless
+java -version
+
+#4 install jenkins (addsto apt sources)
+sudo wget -O /usr/share/keyrings/jenkins-keyring.asc \
+  https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key
+echo deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] \
+  https://pkg.jenkins.io/debian-stable binary/ | sudo tee \
+  /etc/apt/sources.list.d/jenkins.list > /dev/null
+sudo apt-get update
+sudo apt-get install jenkins
+
+#5 
+sudo groupadd docker
+sudo usermod -aG docker $USER
+sudo usermod -aG docker jenkins
+
+#6 
+sudo -su jenkins 
+docker run hello-world
+
+#7 
+exit
+sudo systemctl start jenkins
+
+#8 
+Update inbound rules on security group with Custom CPT (0000:0 on port 8080)
+
+#9
+sudo systemctl status jenkins
+/var/lib/jenkins/secrets/initialAdminPassword
+q
+sudo cat /var/lib/jenkins/secrets/initialAdminPassword
+Password - 6890b069fcf5400f942f0263c5392eee
+
+#10 open the public port on 8080
+http://52.202.206.221:8080
+install suggested plugins
+
+#11 
+sudo apt install unzip
+curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+
+http://52.202.206.221/docs#/
+```
