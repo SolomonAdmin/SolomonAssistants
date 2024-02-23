@@ -3,4 +3,4 @@
 from .stock import get_stock_price
 from .weather import get_weather_data
 from . import jiraAgent
-from .flightRadar import get_airport_details
+from .flightRadar import FlightRadarTool

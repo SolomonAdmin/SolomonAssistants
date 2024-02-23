@@ -22,7 +22,8 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent))
 
 
-from assistant_tools import get_stock_price, get_weather_data, get_airport_details
+from assistant_tools import get_stock_price, get_weather_data
+from assistant_tools import FlightRadarTool
 from assistant_tools.jiraAgent import jira_run_agent_query
 
 from helpers.aws_helpers import get_secret_value
@@ -37,6 +38,8 @@ app = FastAPI()
 
 # Initialize the OpenAI client comment
 client = openai.OpenAI()
+
+flight_radar_tool = FlightRadarTool()
 
 class AssistantData(BaseModel):
     model: str = "gpt-4-1106-preview"
@@ -271,16 +274,9 @@ async def run_assistant(thread_id: str, assistant_id: str, content: str, file_id
                         jira_query=arguments['jira_query']
                     )
                     output = json.dumps(output) 
-                elif func_name == "get_airport_details":
-                    # Run synchronous function in a thread pool
-                    output = await asyncio.to_thread(
-                        get_airport_details,
-                        airport_code=arguments['airport_code']
-                    )
-                    output_dict = {
-                        'airport_code': str(output)
-                    }
-                    output = json.dumps(output_dict)
+                if func_name == "get_airport_details":
+                    airport_details = flight_radar_tool.get_airport_details(arguments['airport_code'])
+                    output = json.dumps(airport_details)
                 else:
                     raise ValueError(f"Unknown function: {func_name}")
 
