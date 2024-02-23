@@ -51,4 +51,21 @@ tools_list = [
             }
         }
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_airport_details",
+            "description": "Retrieves detailed information about an airport using its ICAO code through the FlightRadar24 API.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "airport_code": {
+                        "type": "string",
+                        "description": "The ICAO airport code for which to retrieve details."
+                    }
+                },
+                "required": ["airport_code"]
+            }
+        }
+    },
 ]

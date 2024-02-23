@@ -22,7 +22,7 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent))
 
 
-from assistant_tools import get_stock_price, get_weather_data
+from assistant_tools import get_stock_price, get_weather_data, get_airport_details
 from assistant_tools.jiraAgent import jira_run_agent_query
 
 from helpers.aws_helpers import get_secret_value
@@ -263,14 +263,24 @@ async def run_assistant(thread_id: str, assistant_id: str, content: str, file_id
                         get_weather_data,
                         location=arguments['location']
                     )
-                    output = json.dumps(output)  # Convert dictionary to JSON string
+                    output = json.dumps(output)  
                 elif func_name == "jira_run_agent_query":
                     # Run synchronous function in a thread pool
                     output = await asyncio.to_thread(
                         jira_run_agent_query,
                         jira_query=arguments['jira_query']
                     )
-                    output = json.dumps(output)  # Convert dictionary to JSON string, if necessary
+                    output = json.dumps(output) 
+                elif func_name == "get_airport_details":
+                    # Run synchronous function in a thread pool
+                    output = await asyncio.to_thread(
+                        get_airport_details,
+                        airport_code=arguments['airport_code']
+                    )
+                    output_dict = {
+                        'airport_code': str(output)
+                    }
+                    output = json.dumps(output_dict)
                 else:
                     raise ValueError(f"Unknown function: {func_name}")
 
@@ -288,4 +298,4 @@ async def run_assistant(thread_id: str, assistant_id: str, content: str, file_id
             )
         else:
             print("Waiting for the Assistant to process...")
-            await asyncio.sleep(5)  # Non-blocking sleep
+            await asyncio.sleep(5)  
