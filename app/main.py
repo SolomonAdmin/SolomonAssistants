@@ -30,8 +30,6 @@ from helpers.aws_helpers import get_secret_value
 from tools_config import tools_list
 
 # Set the API key as an environment variable
-os.environ["AWS_ACCESS_KEY_ID"] = get_secret_value("AWS_ACCESS_KEY_ID")
-os.environ["AWS_SECRET_ACCESS_KEY"] = get_secret_value("AWS_SECRET_ACCESS_KEY")
 os.environ["OPENAI_API_KEY"] = get_secret_value("OPENAI_API_KEY")
 
 # Initialize the FastAPI client
