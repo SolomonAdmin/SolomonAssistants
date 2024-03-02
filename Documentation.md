@@ -96,8 +96,8 @@ docker images
 ```
 ```
 # The application is exposed on Port 80. We also pass in the AWS credentials to access our other API keys stored in AWS Secrets
-docker run -e AWS_ACCESS_KEY_ID=FIND_IN_GITHUB_SECRETS \
-           -e AWS_SECRET_ACCESS_KEY=FIND_IN_GITHUB_SECRETS \
+docker run -e AWS_ACCESS_KEY_ID=AKIATEMAXBDJLDYV4P67 \
+           -e AWS_SECRET_ACCESS_KEY=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 \
            -e AWS_DEFAULT_REGION=us-east-1 \
            -p 8000:80 \
            solomonassistantsapp
