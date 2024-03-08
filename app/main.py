@@ -77,7 +77,7 @@ async def create_thread():
         raise HTTPException(status_code=500, detail=str(e))
 
 # POST endpoint to list assistants
-@app.post("/list_assistants/")
+@app.post("/list_assistants")
 async def list_assistants():
     try:
         my_assistants = await asyncio.to_thread(
