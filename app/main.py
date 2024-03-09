@@ -41,7 +41,7 @@ client = openai.OpenAI()
 
 @app.get('/')
 def read_root():
-    return {"message": "Hello, World!"}
+    return {"message": "Hello, World!!"}
 
 class AssistantData(BaseModel):
     model: str = "gpt-4-1106-preview"
