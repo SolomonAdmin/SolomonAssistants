@@ -1,19 +1,19 @@
 # Ignore virtual environments
 venv/
 env/
-.aws/
 node_modules/
-
+aws_configs/
 # Ignore Python compiled files
 *.pyc
 __pycache__/
-
+scripts/
 # Ignore logs and temporary files
 *.log
 .DS_Store
-
+*.pem
 # Ignore local configuration files
 .env
+aws_configs/*
 
 # Ignore build outputs
 dist/
@@ -21,3 +21,4 @@ build/
 
 # Ignore OS generated files
 Thumbs.db
+Documentation.md

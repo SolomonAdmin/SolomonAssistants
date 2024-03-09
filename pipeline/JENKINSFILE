@@ -1,0 +1,76 @@
+pipeline {
+    agent any
+    options { 
+        skipDefaultCheckout() 
+        timeout(time: 30, unit: 'MINUTES')    
+    }
+    environment {
+        NODE_OPTIONS = "--max-old-space-size=3096"
+        REGION = "us-east-1"
+        ECR_URL = "215555180754.dkr.ecr.${REGION}.amazonaws.com"
+        REPO = "solomonassistantsapp"
+    }
+
+    stages{
+
+        stage('SCM: Checkout Code'){
+            steps{
+                script{
+                    cleanWs()
+                    checkout scm
+                    sh 'printenv'
+                }
+                
+            }
+        }
+
+        stage('Docker: Delete Image(s)'){
+            steps{
+                script{
+                    sh """
+                        echo 'Deleting All Images except the latest tag'
+                        docker images | awk -v N=2 '++freq[\$1] <= N'
+                        docker images | docker rmi -f \$(awk -v N=2 '++freq[\$1] > N {print \$3}') || true
+                    """
+                }
+            }
+        }
+         
+        stage('Docker: Login To ECR and run image'){
+            steps{
+                script{
+                    try{
+                        withCredentials([string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'), string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY')]) {
+                            def sha = sh(script: "aws ecr describe-images --repository-name $REPO --query 'sort_by(imageDetails,& imagePushedAt)[-1].imageTags[0]' --output text", returnStdout: true).trim()
+                            echo "sha is $sha"
+                            sh """aws ecr get-login-password --region $REGION | docker login --username AWS --password-stdin $ECR_URL
+                            docker pull $ECR_URL/$REPO:$sha
+                            echo 'Killing other containers'
+                            docker rm -f \$(docker ps -aq)
+                            docker run -p 80:80 -d -e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY $ECR_URL/$REPO:$sha
+                            """
+                    }
+                    }catch(exec){
+                        errorMessage = "Jenkins Failed during BuildImage stage"
+                        sh 'exit 1'
+                    }          
+
+                 }   
+                }
+            
+        }
+
+    }
+
+    post {
+       always {
+           echo "\n"
+       }
+       success{
+           echo "Deployment completed."
+       }
+       failure {
+           echo "Error: ${errorMessage}"
+       }
+   }
+}
