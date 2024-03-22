@@ -22,7 +22,8 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent))
 
 
-from assistant_tools import get_stock_price, get_weather_data
+from assistant_tools import get_stock_price, get_weather_data, send_post_request
+
 # , get_airport_details
 from assistant_tools.jiraAgent import jira_run_agent_query
 
@@ -41,7 +42,7 @@ client = openai.OpenAI()
 
 @app.get('/')
 def read_root():
-    return {"message": "Hello, World!"}
+    return {"message": "Hello, World!!"}
 
 class AssistantData(BaseModel):
     model: str = "gpt-4-1106-preview"
@@ -276,6 +277,14 @@ async def run_assistant(thread_id: str, assistant_id: str, content: str, file_id
                         jira_query=arguments['jira_query']
                     )
                     output = json.dumps(output) 
+                elif func_name == "send_post_request":
+                    # Run synchronous function in a thread pool
+                    output = await asyncio.to_thread(
+                        send_post_request,
+                        data_type=arguments['data_type']
+                    )
+                    output = json.dumps(output)
+
                 # elif func_name == "get_airport_details":
                 #     # Run synchronous function in a thread pool
                 #     output = await asyncio.to_thread(
