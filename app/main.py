@@ -238,7 +238,7 @@ async def run_assistant(thread_id: str, assistant_id: str, content: str, file_id
         file_ids=file_ids if file_ids else []
     )
 
-    # Run the assistant in a thread pool
+    # Run the assistant in a thread pool.
     run = await asyncio.to_thread(
         client.beta.threads.runs.create,
         thread_id=thread_id,
