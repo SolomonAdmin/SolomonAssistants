@@ -13,6 +13,19 @@ from fastapi import FastAPI, Query
 import asyncio
 import json
 
+# from app.endpoints import assistant, thread
+
+# PREFIX= "/api/v1/"
+
+# app = FastAPI()
+
+# app.include_router(assistant.router, prefix=PREFIX)
+# app.include_router(thread.router, prefix=PREFIX)
+
+# @app.get('/')
+# def read_root():
+#     return {"message": "Hello, World!"}
+
 import sys
 from pathlib import Path
 
@@ -22,7 +35,8 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent))
 
 
-from assistant_tools import get_stock_price, get_weather_data, send_post_request
+from assistant_tools import get_stock_price, send_post_request
+# from assistant_tools import get_weather_data
 
 # , get_airport_details
 from assistant_tools.jiraAgent import jira_run_agent_query
@@ -49,7 +63,7 @@ class AssistantData(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
     instructions: Optional[str] = None
-    tools: Optional[List[str]] = []
+    tools: Optional[List[str]] = [{"type": "file_search"}]
     file_ids: Optional[List[str]] = []
     metadata: Optional[Dict[str, str]] = {}
 
@@ -228,7 +242,8 @@ async def run_assistant(thread_id: str, assistant_id: str, content: str, file_id
     run = await asyncio.to_thread(
         client.beta.threads.runs.create,
         thread_id=thread_id,
-        assistant_id=assistant_id
+        assistant_id=assistant_id,
+        model="gpt-4-1106-preview"
     )
 
     # Check run status
