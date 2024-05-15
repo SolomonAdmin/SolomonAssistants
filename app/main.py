@@ -66,7 +66,7 @@ class AssistantData(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
     instructions: Optional[str] = None
-    tools: Optional[List[str]] = [{"type": "file_search"}]
+    tools: Optional[List[str]] = []
     file_ids: Optional[List[str]] = []
     metadata: Optional[Dict[str, str]] = {}
 
