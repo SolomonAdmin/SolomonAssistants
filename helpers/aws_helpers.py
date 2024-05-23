@@ -2,17 +2,21 @@ import boto3
 from botocore.exceptions import ClientError
 import json
 
-def get_secret_value(key_name: str):
+from config import Settings, get_settings
 
-    secret_name = "prod/SolomonAssistantsApp"
-    region_name = "us-east-1"
+settings: Settings = get_settings()
+
+def get_secret_value(key_name: str):
+    secret_name = settings.aws_secret_name
+    region_name = settings.aws_default_region
 
     # Create a Secrets Manager client
-    session = boto3.session.Session()
-    client = session.client(
-        service_name='secretsmanager',
+    session = boto3.session.Session(
+        aws_access_key_id=settings.aws_access_key_id,
+        aws_secret_access_key=settings.aws_secret_access_key,
         region_name=region_name
     )
+    client = session.client(service_name='secretsmanager')
 
     try:
         get_secret_value_response = client.get_secret_value(

@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, UploadFile, File
-from app.services import create_thread_with_file_service
+from services.services import create_thread_with_file_service
 
 router = APIRouter()
 
