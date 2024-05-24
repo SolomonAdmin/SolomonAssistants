@@ -4,6 +4,7 @@ import sys
 import os
 from pathlib import Path
 from router import router
+from routers.healthcheck import router_health_check
 # Add the parent directory to sys.path to make 'tools' module discoverable
 sys.path.append(str(Path(__file__).parent.parent))
 
@@ -28,6 +29,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(router_health_check)
 app.include_router(router)
 
 
