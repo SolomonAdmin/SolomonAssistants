@@ -7,7 +7,9 @@ import logging
 router_runs = APIRouter(prefix="/runs", tags=["Runs V2"])
 
 @router_runs.post("/create_thread_and_run", response_model=ListMessagesResponse)
-async def create_thread_and_run_endpoint(create_thread_run_request: CreateThreadRunRequest):
+async def create_thread_and_run_endpoint(
+    create_thread_run_request: CreateThreadRunRequest
+    ):
     try:
         # Create and run the thread, then list the messages
         messages_response = create_run_and_list_messages(create_thread_run_request)
