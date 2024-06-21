@@ -1,7 +1,8 @@
 from fastapi import APIRouter, HTTPException, Query
-from models.models_messages import ListMessagesResponse
-from services.service_messages import list_thread_messages
+from models.models_messages import ListMessagesResponse, CreateMessageRequest, CreateMessageResponse
+from services.service_messages import list_thread_messages, create_message
 import logging
+from typing import Optional
 
 router_messages = APIRouter(prefix="/messages", tags=["Messages"])
 
@@ -16,4 +17,17 @@ async def list_messages_endpoint(
         return response
     except Exception as e:
         logging.error(f"Error in list_messages_endpoint: {e}")
+        raise HTTPException(status_code=500, detail="Internal Server Error")
+    
+@router_messages.post("/create_message/threads/{thread_id}/messages", response_model=CreateMessageResponse)
+async def create_message_endpoint(
+    thread_id: str,
+    create_message_request: CreateMessageRequest,
+    openai_api_key: Optional[str] = Query(None, description="Optional OpenAI API key")
+):
+    try:
+        response = create_message(thread_id, create_message_request, openai_api_key=openai_api_key)
+        return response
+    except Exception as e:
+        logging.error(f"Error in create_message_endpoint: {e}")
         raise HTTPException(status_code=500, detail="Internal Server Error")
