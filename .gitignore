@@ -1,6 +1,7 @@
 # Ignore virtual environments
 venv/
 env/
+.env
 node_modules/
 aws_configs/
 # Ignore Python compiled files

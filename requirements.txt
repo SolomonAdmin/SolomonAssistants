@@ -13,3 +13,4 @@ python-multipart
 langchain
 atlassian-python-api
 langchain_openai
+pydantic-settings
