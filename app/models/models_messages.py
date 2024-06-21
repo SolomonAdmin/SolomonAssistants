@@ -34,3 +34,19 @@ class ListMessagesResponse(BaseModel):
     first_id: Optional[str] = None
     last_id: Optional[str] = None
     has_more: bool
+
+class CreateMessageRequest(BaseModel):
+    role: str
+    content: str
+    attachments: Optional[List[Any]] = None
+    metadata: Optional[Dict[str, Any]] = None
+
+class CreateMessageResponse(BaseModel):
+    id: str
+    object: str
+    created_at: int
+    thread_id: str
+    role: str
+    content: List[Content]
+    attachments: Optional[List[Any]] = None
+    metadata: Dict[str, Any] 
