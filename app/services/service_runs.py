@@ -10,6 +10,7 @@ from utils import get_headers
 from tools import tool_registry
 import json
 from typing import List, Dict, Any, Union, Optional
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 
@@ -111,6 +112,11 @@ def get_thread_messages(thread_id: str, limit: int = 20, order: str = "desc", op
 #     # List the messages in the completed thread
 #     return get_thread_messages(final_response.thread_id, openai_api_key=openai_api_key)
 
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
+def make_request(url, method='get', **kwargs):
+    response = requests.request(method, url, **kwargs)
+    response.raise_for_status()
+    return response
 
 def run_thread_and_list_messages(
     thread_id: str, 
@@ -124,18 +130,19 @@ def run_thread_and_list_messages(
     
     logger.info(f"Running thread {thread_id} with assistant {assistant_id}")
     run_url = f"https://api.openai.com/v1/threads/{thread_id}/runs"
-    run_payload = {
-        "assistant_id": assistant_id
-    }
+    run_payload = {"assistant_id": assistant_id}
     
     if tools:
         run_payload['tools'] = tools
         logger.info(f"Added {len(tools)} tools to run payload")
     
-    run_response = requests.post(run_url, headers=headers, json=run_payload)
-    run_response.raise_for_status()
-    run = run_response.json()
-    logger.info(f"Run created with ID: {run['id']}")
+    try:
+        run_response = make_request(run_url, method='post', headers=headers, json=run_payload)
+        run = run_response.json()
+        logger.info(f"Run created with ID: {run['id']}")
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Failed to create run: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to create run")
     
     start_time = time.time()
     
@@ -147,10 +154,13 @@ def run_thread_and_list_messages(
         
         time.sleep(interval)
         run_status_url = f"https://api.openai.com/v1/threads/{thread_id}/runs/{run['id']}"
-        run_status_response = requests.get(run_status_url, headers=headers)
-        run_status_response.raise_for_status()
-        run = run_status_response.json()
-        logger.info(f"Current run status: {run['status']}")
+        try:
+            run_status_response = make_request(run_status_url, headers=headers)
+            run = run_status_response.json()
+            logger.info(f"Current run status: {run['status']}")
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Failed to get run status: {str(e)}")
+            continue
         
         if run['status'] == 'requires_action':
             logger.info("Run requires action, handling tools")
@@ -160,10 +170,13 @@ def run_thread_and_list_messages(
 
     logger.info("Listing messages")
     messages_url = f"https://api.openai.com/v1/threads/{thread_id}/messages"
-    messages_response = requests.get(messages_url, headers=headers)
-    messages_response.raise_for_status()
-    messages = messages_response.json()
-    logger.info(f"Retrieved messages")
+    try:
+        messages_response = make_request(messages_url, headers=headers)
+        messages = messages_response.json()
+        logger.info(f"Retrieved messages")
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Failed to retrieve messages: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve messages")
     
     if 'data' in messages and isinstance(messages['data'], list):
         return messages['data']

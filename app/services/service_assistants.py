@@ -3,13 +3,12 @@ import asyncio
 import logging
 from fastapi import UploadFile
 from models.models_assistants import CreateAssistantRequest, CreateAssistantWithToolsRequest, Assistant
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Union
 import os
 import httpx
 from fastapi import HTTPException
 import logging
 import requests
-from typing import Dict, Any
 from utils import get_headers
 from tools import tool_registry
 
@@ -105,16 +104,29 @@ def delete_openai_assistant(assistant_id: str, openai_api_key: str = None) -> di
         raise HTTPException(status_code=err.response.status_code if err.response else 500, 
                             detail=str(err))
 
-def _get_tool_definitions(tools: List[str] = None) -> List[Dict[str, Any]]:
+def _get_tool_definitions(tools: List[Union[str, Dict[str, Any]]] = None) -> List[Dict[str, Any]]:
     if not tools:
         return []
-    return [
-        {
-            "type": "function",
-            "function": tool_registry[tool]().get_definition()['function']
-        }
-        for tool in tools if tool in tool_registry
-    ]
+    
+    tool_definitions = []
+    for tool in tools:
+        if isinstance(tool, str):
+            if tool in tool_registry:
+                tool_definitions.append({
+                    "type": "function",
+                    "function": tool_registry[tool]().get_definition()['function']
+                })
+            else:
+                logger.warning(f"Unknown tool: {tool}")
+        elif isinstance(tool, dict):
+            if 'type' in tool:
+                tool_definitions.append(tool)
+            else:
+                logger.warning(f"Invalid tool definition: {tool}")
+        else:
+            logger.warning(f"Invalid tool type: {type(tool)}")
+    
+    return tool_definitions
 
 # New function to get an assistant's details
 def get_openai_assistant(assistant_id: str, openai_api_key: str = None) -> dict:
