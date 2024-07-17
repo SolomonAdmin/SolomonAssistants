@@ -51,12 +51,12 @@ class ModifyAssistantRequest(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
     instructions: Optional[str] = None
-    tools: Optional[List[dict]] = []
-    tool_resources: Optional[Dict[str, Union[dict, None]]] = None
+    tools: Optional[List[Union[str, Dict[str, Any]]]] = None
+    tool_resources: Optional[Dict[str, Any]] = None
     metadata: Optional[Dict[str, Union[str, int]]] = None
     temperature: Optional[float] = None
     top_p: Optional[float] = None
-    response_format: Optional[Union[str, Dict[str, str]]] = "auto"
+    response_format: Optional[Union[str, Dict[str, str]]] = None
     
 class DeleteAssistantResponse(BaseModel):
     id: str
