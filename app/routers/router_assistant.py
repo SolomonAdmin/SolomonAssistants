@@ -1,10 +1,28 @@
 from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Query, Path
-from models.models_assistants import CreateAssistantRequest, ListAssistantsResponse, Assistant, ModifyAssistantRequest, DeleteAssistantResponse
-from services.service_assistants import create_assistant_service, list_openai_assistants, modify_openai_assistant, delete_openai_assistant
+from models.models_assistants import CreateAssistantRequest, ListAssistantsResponse, Assistant, ModifyAssistantRequest, DeleteAssistantResponse, CreateAssistantWithToolsRequest
+from services.service_assistants import create_assistant_service, list_openai_assistants, modify_openai_assistant, delete_openai_assistant, create_assistant_with_tools
 import logging
 from typing import Optional
+from tools import tool_registry
+
 
 router_assistant = APIRouter(prefix="/assistant", tags=["Assistants V2"])
+
+@router_assistant.post("/create_with_tools", response_model=Assistant)
+async def create_assistant_with_tools_endpoint(
+    assistant_data: CreateAssistantWithToolsRequest,
+    openai_api_key: Optional[str] = Query(None, description="Optional OpenAI API key")
+):
+    try:
+        if not assistant_data.tools:
+            assistant_data.tools = [
+                tool_class().get_definition() for tool_class in tool_registry.values()
+            ]
+        
+        assistant = create_assistant_with_tools(assistant_data, openai_api_key)
+        return assistant
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error creating assistant: {str(e)}")
 
 @router_assistant.post("/create_assistant")
 async def create_assistant(

@@ -12,10 +12,10 @@ def send_post_request(data_type: str) -> dict:
         'API-TOKEN': 'af1d16385d51a386e715e3867b747a928c048bd3b9c7f03f5bc61aa606368e03',
         'Content-Type': 'application/json'
     }
-    data = {'type': data_type}
+    data = {'data_type': data_type, 'info': "This is a test call"}
     response = requests.post(url, json=data, headers=headers)
-    return response.json()
+    return response
 
 # Example usage
-# response = send_post_request('failed')
-# print(response)
+response = send_post_request('contact')
+print(response)
