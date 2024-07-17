@@ -15,7 +15,7 @@ scripts/
 # Ignore local configuration files
 .env
 aws_configs/*
-
+.vscode/launch.json
 # Ignore build outputs
 dist/
 build/

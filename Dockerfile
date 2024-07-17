@@ -6,10 +6,8 @@ WORKDIR /app
 
 # Copy the application and other necessary files
 COPY ./app /app/app
-COPY ./assistant_tools /app/assistant_tools
 COPY ./helpers /app/helpers
 COPY ./config.py /app/
-COPY ./tools_config.py /app/
 COPY requirements.txt /app/
 
 # Install any needed packages specified in requirements.txt
@@ -22,4 +20,4 @@ EXPOSE 80
 ENV PYTHONPATH="/app:/app/app"
 
 # Run the application
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "80"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "80"]

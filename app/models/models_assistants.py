@@ -11,7 +11,19 @@ class CreateAssistantRequest(BaseModel):
     temperature: Optional[float] = 1.0
     top_p: Optional[float] = 1.0
     response_format: Optional[Any] = "auto" 
-    
+
+class ToolDefinition(BaseModel):
+    type: str
+    function: Dict[str, Any]
+
+class CreateAssistantWithToolsRequest(BaseModel):
+    model: str = "gpt-4o"
+    name: Optional[str] = Field(None, description="The name of the assistant")
+    description: Optional[str] = Field(None, description="The description of the assistant")
+    instructions: Optional[str] = Field(None, description="The system instructions that the assistant uses")
+    tools: List[ToolDefinition] = Field(default_factory=list, description="A list of tools enabled on the assistant")
+    file_ids: Optional[List[str]] = Field(default_factory=list, description="A list of file IDs attached to the assistant")
+    metadata: Optional[Dict[str, str]] = Field(None, description="Set of key-value pairs that can be attached to an object")
 class Assistant(BaseModel):
     id: str
     object: str
@@ -51,3 +63,9 @@ class DeleteAssistantResponse(BaseModel):
     object: str
     deleted: bool
     
+class UpdateAssistantRequest(BaseModel):
+    assistant_id: str
+    name: Optional[str] = None
+    instructions: Optional[str] = None
+    model: Optional[str] = None
+    tools: Optional[List[str]] = None

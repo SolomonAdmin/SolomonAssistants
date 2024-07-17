@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  web:
+    build: .
+    ports:
+      - "80:80"
+    env_file:
+      - .env
+    volumes:
+      - ./app:/app/app
+      - ./helpers:/app/helpers
+      - ./config.py:/app/config.py
+    command: uvicorn app.main:app --host 0.0.0.0 --port 80 --reload
+
+volumes:
+  app:
+  helpers:

@@ -1,5 +1,5 @@
 from typing import List, Optional, Dict, Any
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 class Message(BaseModel):
     role: str = "user"
@@ -8,9 +8,9 @@ class Message(BaseModel):
 class Thread(BaseModel):
     messages: List[Message]
 
-class CreateThreadRunRequest(BaseModel):
-    assistant_id: str
-    thread: Thread
+# class CreateThreadRunRequest(BaseModel):
+#     assistant_id: str
+#     thread: Thread
 
 class Tool(BaseModel):
     type: str
@@ -51,3 +51,27 @@ class RunResponse(BaseModel):
     truncation_strategy: Optional[TruncationStrategy]
     response_format: Optional[str]
     tool_choice: Optional[Any]
+
+class ToolDefinition(BaseModel):
+    type: str
+    function: Dict[str, Any] = Field(default_factory=dict)
+
+    @classmethod
+    def __get_validators__(cls):
+        yield cls.validate
+
+    @classmethod
+    def validate(cls, v):
+        if isinstance(v, dict):
+            return cls(**v)
+        return v
+
+class CreateThreadRunRequest(BaseModel):
+    assistant_id: str
+    thread: Thread
+    tools: Optional[List[dict]] = None
+
+class RunThreadRequest(BaseModel):
+    thread_id: str
+    assistant_id: str
+    tools: Optional[List[Dict[str, Any]]] = None
