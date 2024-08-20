@@ -30,7 +30,7 @@ async def create_assistant(
     openai_api_key: Optional[str] = Query(None, description="Optional OpenAI API key")
     ):
     try:
-        response = await create_assistant_service(assistant, openai_api_key)
+        response = create_assistant_service(assistant, openai_api_key)
         return response
     except Exception as e:
         logging.error(f"Error in create_assistant: {e}")
