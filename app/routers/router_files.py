@@ -1,4 +1,4 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException, Form, Query
+from fastapi import APIRouter, UploadFile, File, HTTPException, Form, Query, Header
 from models.models_files import UploadFileResponse, ListFilesResponse
 from services.service_files import upload_file, list_files
 import logging
@@ -11,7 +11,7 @@ router_files = APIRouter(prefix="/files", tags=["Files V2"])
 async def upload_file_endpoint(
     file: UploadFile = File(...),  # The uploaded file
     purpose: str = Form("assistants"),  # The purpose of the file, defaulting to "assistants"
-    openai_api_key: Optional[str] = Form(...)  # The API key passed as a form field
+    openai_api_key: str = Header(...)  # The API key passed as a header
 ):
     try:
         # Save the uploaded file temporarily
@@ -33,7 +33,7 @@ async def upload_file_endpoint(
 @router_files.get("/list", response_model=ListFilesResponse)
 async def list_files_endpoint(
     purpose: Optional[str] = Query(None, description="Filter by file purpose"),
-    openai_api_key: Optional[str] = Query(None, description="API key to use for the request")
+    openai_api_key: str = Header(...)  # API key passed as a header
 ):
     try:
         response = list_files(purpose=purpose, openai_api_key=openai_api_key)
