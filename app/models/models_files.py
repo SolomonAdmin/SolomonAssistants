@@ -1,13 +1,8 @@
 from pydantic import BaseModel
-from typing import Optional
-from typing import List
+from typing import Optional, List
 
 class UploadFileRequest(BaseModel):
-    purpose: str
-    
-class UploadFileRequest(BaseModel):
-    file: str  # Assuming the file is a string representation or path
-    purpose: Optional[str] = "assistants"
+    purpose: str = "assistants"  # Default value set to "assistants"
 
 class FileResponse(BaseModel):
     id: str
