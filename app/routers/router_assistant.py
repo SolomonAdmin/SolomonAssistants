@@ -84,20 +84,6 @@ async def modify_assistant(
 ) -> AssistantResponse:
     """
     Modify an existing assistant.
-
-    This endpoint allows you to update various properties of an existing assistant,
-    such as its name, description, instructions, and associated tools.
-
-    Args:
-        assistant_id (str): The ID of the assistant to modify.
-        request (ModifyAssistantRequest): The modifications to apply to the assistant.
-        openai_api_key (Optional[str]): An optional OpenAI API key to use for this request.
-
-    Returns:
-        AssistantResponse: The updated assistant object.
-
-    Raises:
-        HTTPException: If there's an error modifying the assistant.
     """
     try:
         modifications = request.dict(exclude_unset=True) if request else {}
