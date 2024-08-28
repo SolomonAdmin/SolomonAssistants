@@ -48,10 +48,10 @@ def get_openapi_yaml() -> Response:
     yaml_output = yaml.dump(openapi_json)  # Convert JSON to YAML
     return Response(content=yaml_output, media_type="text/x-yaml")
 
-# Optional: Add a root endpoint
-@app.get("/")
-async def root():
-    return {"message": "Welcome to the API"}
+# # Optional: Add a root endpoint
+# @app.get("/")
+# async def root():
+#     return {"message": "Welcome to the API"}
 
 if __name__ == "__main__":
     import uvicorn
