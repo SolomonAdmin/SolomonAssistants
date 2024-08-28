@@ -3,7 +3,7 @@ import asyncio
 import logging
 from fastapi import UploadFile
 from models.models_assistants import CreateAssistantRequest, CreateAssistantWithToolsRequest, Assistant
-from typing import Dict, Any, List, Union
+from typing import Dict, Any, List, Union, Optional
 import os
 import httpx
 from fastapi import HTTPException
@@ -58,29 +58,38 @@ def create_assistant_with_tools(assistant_data: CreateAssistantWithToolsRequest,
         logger.error(f"Error creating assistant: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error creating assistant: {str(e)}")
     
-def list_openai_assistants(order="desc", limit=20, openai_api_key: str = None):
+def list_openai_assistants(limit: int = 20, order: str = "desc", openai_api_key: Optional[str] = None):
     url = "https://api.openai.com/v1/assistants"
     headers = get_headers(openai_api_key)
+    
     params = {
-        "order": order,
-        "limit": limit
+        "limit": limit,
+        "order": order
     }
+    
     try:
         response = requests.get(url, headers=headers, params=params)
         response.raise_for_status()
         return response.json()
-    except requests.exceptions.RequestException as err:
-        logger.error(f"Request Error: {err}")
-        raise HTTPException(status_code=err.response.status_code if err.response else 500, 
-                            detail=str(err))
+    except requests.exceptions.RequestException as e:
+        logging.error(f"Error in list_openai_assistants: {e}")
+        raise HTTPException(status_code=500, detail="Error fetching assistants from OpenAI")
 
 def modify_openai_assistant(assistant_id: str, data: Dict[str, Any], openai_api_key: str = None):
     url = f"https://api.openai.com/v1/assistants/{assistant_id}"
     headers = get_headers(openai_api_key)
     
-    # If tools are being updated, convert them to the correct format
+    if not data:
+        # If no modifications are provided, just fetch and return the current assistant data
+        return get_openai_assistant(assistant_id, openai_api_key)
+    
+    # If tools are being updated, ensure they're in the correct format
     if 'tools' in data:
-        data['tools'] = _get_tool_definitions(data['tools'])
+        data['tools'] = [{"type": tool.type} for tool in data['tools']]
+    
+    # If tool_resources are being updated, ensure they're in the correct format
+    if 'tool_resources' in data and data['tool_resources']:
+        data['tool_resources'] = data['tool_resources'].dict(exclude_unset=True)
     
     try:
         response = requests.post(url, headers=headers, json=data)
@@ -88,8 +97,10 @@ def modify_openai_assistant(assistant_id: str, data: Dict[str, Any], openai_api_
         return response.json()
     except requests.exceptions.RequestException as err:
         logger.error(f"Request Error: {err}")
-        raise HTTPException(status_code=err.response.status_code if err.response else 500, 
-                            detail=str(err))
+        if err.response:
+            error_detail = err.response.json().get('error', {}).get('message', str(err))
+            raise HTTPException(status_code=err.response.status_code, detail=error_detail)
+        raise HTTPException(status_code=500, detail="Internal Server Error")
 
 def delete_openai_assistant(assistant_id: str, openai_api_key: str = None) -> dict:
     url = f"https://api.openai.com/v1/assistants/{assistant_id}"

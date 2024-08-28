@@ -33,10 +33,11 @@ def list_thread_messages(thread_id: str, limit: int = 20, order: str = "desc", o
         logging.error(f"Request Error: {err}")
         raise
 
-def create_message(thread_id: str, create_message_request: CreateMessageRequest, openai_api_key: str = None) -> CreateMessageResponse:
+def create_message(thread_id: str, create_message_request: CreateMessageRequest, openai_api_key: Optional[str] = None) -> CreateMessageResponse:
     url = f"https://api.openai.com/v1/threads/{thread_id}/messages"
     headers = get_headers(openai_api_key)
-    payload = create_message_request.dict(exclude_none=True)  # Exclude None values
+    payload = create_message_request.dict(exclude_unset=True)  # This excludes None values and unset fields
+    
     logging.info(f"Sending request to {url}")
     logging.info(f"Headers: {headers}")
     logging.info(f"Payload: {payload}")
