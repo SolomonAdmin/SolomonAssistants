@@ -53,8 +53,8 @@ class Assistant(BaseModel):
 class ListAssistantsRequest(BaseModel):
     limit: Optional[int] = Field(20, description="A limit on the number of objects to be returned. Limit can range between 1 and 100, and the default is 20.")
     order: Optional[str] = Field("desc", description="Sort order by the created_at timestamp of the objects. asc for ascending order and desc for descending order.")
-    after: Optional[str] = Field(None, description="A cursor for use in pagination. after is an object ID that defines your place in the list. For instance, if you make a list request and receive 100 objects, ending with obj_foo, your subsequent call can include after=obj_foo in order to fetch the next page of the list.")
-    before: Optional[str] = Field(None, description="A cursor for use in pagination. before is an object ID that defines your place in the list. For instance, if you make a list request and receive 100 objects, ending with obj_foo, your subsequent call can include before=obj_foo in order to fetch the previous page of the list.")
+    # after: Optional[str] = Field(None, description="A cursor for use in pagination. after is an object ID that defines your place in the list. For instance, if you make a list request and receive 100 objects, ending with obj_foo, your subsequent call can include after=obj_foo in order to fetch the next page of the list.")
+    # before: Optional[str] = Field(None, description="A cursor for use in pagination. before is an object ID that defines your place in the list. For instance, if you make a list request and receive 100 objects, ending with obj_foo, your subsequent call can include before=obj_foo in order to fetch the previous page of the list.")
 
 class ListAssistantsResponse(BaseModel):
     object: str = Field("list", description="The object type, which is always 'list'")
