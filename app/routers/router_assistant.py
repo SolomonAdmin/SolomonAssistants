@@ -52,8 +52,8 @@ async def create_assistant(
 async def get_openai_assistants_endpoint(
     limit: Optional[int] = Query(20, description="A limit on the number of objects to be returned. Limit can range between 1 and 100, and the default is 20."),
     order: Optional[str] = Query("desc", description="Sort order by the created_at timestamp of the objects. asc for ascending order and desc for descending order."),
-    after: Optional[str] = Query(None, description="A cursor for use in pagination. after is an object ID that defines your place in the list."),
-    before: Optional[str] = Query(None, description="A cursor for use in pagination. before is an object ID that defines your place in the list."),
+    # after: Optional[str] = Query(None, description="A cursor for use in pagination. after is an object ID that defines your place in the list."),
+    # before: Optional[str] = Query(None, description="A cursor for use in pagination. before is an object ID that defines your place in the list."),
     openai_api_key: Optional[str] = Query(None, description="Optional OpenAI API key")
 ):
     try:
@@ -63,13 +63,13 @@ async def get_openai_assistants_endpoint(
             openai_api_key=openai_api_key
         )
         
-        # Handle pagination if 'after' or 'before' is provided
-        if after:
-            # Implement logic to fetch the next page
-            pass
-        elif before:
-            # Implement logic to fetch the previous page
-            pass
+        # # Handle pagination if 'after' or 'before' is provided
+        # if after:
+        #     # Implement logic to fetch the next page
+        #     pass
+        # elif before:
+        #     # Implement logic to fetch the previous page
+        #     pass
         
         return ListAssistantsResponse(**response)
     except Exception as e:
