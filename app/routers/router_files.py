@@ -7,7 +7,7 @@ from typing import Optional
 
 router_files = APIRouter(prefix="/files", tags=["Files V2"])
 
-@router_files.post("/upload", response_model=UploadFileResponse)
+@router_files.post("/upload", response_model=UploadFileResponse, operation_id="upload_file")
 async def upload_file_endpoint(
     file: UploadFile = File(...),  # The uploaded file
     purpose: str = Form("assistants"),  # The purpose of the file, defaulting to "assistants"
@@ -30,7 +30,7 @@ async def upload_file_endpoint(
         logging.error(f"Error in upload_file_endpoint: {e}")
         raise HTTPException(status_code=500, detail="Internal Server Error")
 
-@router_files.get("/list", response_model=ListFilesResponse)
+@router_files.get("/list", response_model=ListFilesResponse, operation_id="list_files")
 async def list_files_endpoint(
     purpose: Optional[str] = Query(None, description="Filter by file purpose"),
     openai_api_key: str = Header(...)  # API key passed as a header

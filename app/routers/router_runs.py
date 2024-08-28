@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 #         logging.error(f"Error in create_thread_and_run_endpoint: {e}")
 #         raise HTTPException(status_code=500, detail="Internal Server Error")
 
-@router_runs.post("/create_thread_and_run", response_model=List[Dict[str, Any]])
+@router_runs.post("/create_thread_and_run", response_model=List[Dict[str, Any]], operation_id="create_thread_and_run")
 async def create_thread_and_run_endpoint(
     create_thread_run_request: CreateThreadRunRequest,
     openai_api_key: str = Query(None, description="Optional OpenAI API key")
@@ -56,7 +56,7 @@ async def create_thread_and_run_endpoint(
         logger.exception(f"Error in create_thread_and_run_endpoint: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
 
-@router_runs.post("/run_thread_and_list_messages", response_model=Union[List[Dict[str, Any]], Dict[str, Any]])
+@router_runs.post("/run_thread_and_list_messages", response_model=Union[List[Dict[str, Any]], Dict[str, Any]], operation_id="run_thread_and_list_messages")
 async def run_thread_and_list_messages_endpoint(
     run_thread_request: RunThreadRequest,
     openai_api_key: Optional[str] = Query(None, description="Optional OpenAI API key")

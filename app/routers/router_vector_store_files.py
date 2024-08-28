@@ -7,7 +7,7 @@ import requests
 
 router_vector_store_files = APIRouter(prefix="/vector_stores", tags=["Vector Store Files V2"])
 
-@router_vector_store_files.post("/create_vector_store_file/{vector_store_id}/files", response_model=VectorStoreFileResponse)
+@router_vector_store_files.post("/create_vector_store_file/{vector_store_id}/files", response_model=VectorStoreFileResponse, operation_id="create_vector_store_file")
 async def create_vector_store_file_endpoint(vector_store_id: str, create_vector_store_file_request: CreateVectorStoreFileRequest):
     try:
         response = create_vector_store_file(vector_store_id, create_vector_store_file_request)
@@ -19,7 +19,7 @@ async def create_vector_store_file_endpoint(vector_store_id: str, create_vector_
         logging.error(f"Error in create_vector_store_file_endpoint: {e}")
         raise HTTPException(status_code=500, detail="Internal Server Error")
 
-@router_vector_store_files.get("/list_vector_store_files/{vector_store_id}/files", response_model=ListVectorStoreFilesResponse)
+@router_vector_store_files.get("/list_vector_store_files/{vector_store_id}/files", response_model=ListVectorStoreFilesResponse, operation_id="list_vector_store_files")
 async def list_vector_store_files_endpoint(
     vector_store_id: str,
     limit: int = Query(20, description="A limit on the number of objects to be returned. Limit can range between 1 and 100."),
@@ -35,7 +35,7 @@ async def list_vector_store_files_endpoint(
         logging.error(f"Error in list_vector_store_files_endpoint: {e}")
         raise HTTPException(status_code=500, detail="Internal Server Error")
 
-@router_vector_store_files.delete("/delete_vector_store_file/{vector_store_id}/files/{file_id}", response_model=DeleteVectorStoreFileResponse)
+@router_vector_store_files.delete("/delete_vector_store_file/{vector_store_id}/files/{file_id}", response_model=DeleteVectorStoreFileResponse, operation_id="delete_vector_store_file")
 async def delete_vector_store_file_endpoint(vector_store_id: str, file_id: str):
     try:
         response = delete_vector_store_file(vector_store_id, file_id)
@@ -44,7 +44,7 @@ async def delete_vector_store_file_endpoint(vector_store_id: str, file_id: str):
         logging.error(f"Error in delete_vector_store_file_endpoint: {e}")
         raise HTTPException(status_code=500, detail="Internal Server Error")
 
-@router_vector_store_files.get("/retrieve_vector_store_file/{vector_store_id}/files/{file_id}", response_model=VectorStoreFileResponse)
+@router_vector_store_files.get("/retrieve_vector_store_file/{vector_store_id}/files/{file_id}", response_model=VectorStoreFileResponse, operation_id="retrieve_vector_store_file")
 async def retrieve_vector_store_file_endpoint(vector_store_id: str, file_id: str):
     try:
         response = retrieve_vector_store_file(vector_store_id, file_id)
