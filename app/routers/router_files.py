@@ -30,14 +30,14 @@ async def upload_file_endpoint(
         logging.error(f"Error in upload_file_endpoint: {e}")
         raise HTTPException(status_code=500, detail="Internal Server Error")
 
-@router_files.get("/list", response_model=ListFilesResponse, operation_id="list_files")
-async def list_files_endpoint(
-    purpose: Optional[str] = Query(None, description="Filter by file purpose"),
-    openai_api_key: str = Header(...)  # API key passed as a header
-):
-    try:
-        response = list_files(purpose=purpose, openai_api_key=openai_api_key)
-        return response
-    except Exception as e:
-        logging.error(f"Error in list_files_endpoint: {e}")
-        raise HTTPException(status_code=500, detail="Internal Server Error")
+# @router_files.get("/list", response_model=ListFilesResponse, operation_id="list_files")
+# async def list_files_endpoint(
+#     purpose: Optional[str] = Query(None, description="Filter by file purpose"),
+#     openai_api_key: str = Header(...)  # API key passed as a header
+# ):
+#     try:
+#         response = list_files(purpose=purpose, openai_api_key=openai_api_key)
+#         return response
+#     except Exception as e:
+#         logging.error(f"Error in list_files_endpoint: {e}")
+#         raise HTTPException(status_code=500, detail="Internal Server Error")
