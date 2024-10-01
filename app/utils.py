@@ -11,7 +11,7 @@ dotenv_path = os.path.join(os.path.dirname(current_dir), '.env')
 # Load the .env file
 load_dotenv(dotenv_path)
 
-# Get the OPENAI_API_KEY from the environment variables
+# Get environment variables
 OPENAI_API_KEY_env = os.getenv('OPENAI_API_KEY')
 
 def get_headers(openai_api_key: str = None) -> dict:
@@ -27,6 +27,6 @@ def get_headers(openai_api_key: str = None) -> dict:
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
-        "OpenAI-Beta": "assistants=v2"
+            "OpenAI-Beta": "assistants=v2"
     }
     return headers
