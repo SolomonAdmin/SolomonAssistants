@@ -49,4 +49,4 @@ class CreateMessageResponse(BaseModel):
     role: str
     content: List[Content]
     attachments: Optional[List[Any]] = None
-    metadata: Dict[str, Any] 
+    metadata: Dict[str, Any]

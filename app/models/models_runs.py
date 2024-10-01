@@ -8,10 +8,6 @@ class Message(BaseModel):
 class Thread(BaseModel):
     messages: List[Message]
 
-# class CreateThreadRunRequest(BaseModel):
-#     assistant_id: str
-#     thread: Thread
-
 class Tool(BaseModel):
     type: str
 
