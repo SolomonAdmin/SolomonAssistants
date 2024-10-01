@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 
-def create_assistant_service(assistant: CreateAssistantRequest, openai_api_key: str = None):
+def create_assistant_service(assistant: CreateAssistantRequest, openai_api_key: str):
     url = "https://api.openai.com/v1/assistants"
     headers = get_headers(openai_api_key)
     
@@ -33,7 +33,6 @@ def create_assistant_service(assistant: CreateAssistantRequest, openai_api_key: 
     
     try:
         response = requests.post(url, headers=headers, json=assistant_data)
-        print(response)
         response.raise_for_status()
         logger.info(f"Assistant created successfully: {response.json()}")
         return response.json()
@@ -44,7 +43,7 @@ def create_assistant_service(assistant: CreateAssistantRequest, openai_api_key: 
         logger.error(f"Unexpected error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
-def create_assistant_with_tools(assistant_data: CreateAssistantWithToolsRequest, openai_api_key: str = None) -> Assistant:
+def create_assistant_with_tools(assistant_data: CreateAssistantWithToolsRequest, openai_api_key: str) -> Assistant:
     url = "https://api.openai.com/v1/assistants"
     headers = get_headers(openai_api_key)
     
@@ -75,7 +74,7 @@ def list_openai_assistants(limit: int = 20, order: str = "desc", openai_api_key:
         logging.error(f"Error in list_openai_assistants: {e}")
         raise HTTPException(status_code=500, detail="Error fetching assistants from OpenAI")
 
-def modify_openai_assistant(assistant_id: str, data: Dict[str, Any], openai_api_key: str = None):
+def modify_openai_assistant(assistant_id: str, data: Dict[str, Any], openai_api_key: str):
     url = f"https://api.openai.com/v1/assistants/{assistant_id}"
     headers = get_headers(openai_api_key)
     
@@ -102,7 +101,7 @@ def modify_openai_assistant(assistant_id: str, data: Dict[str, Any], openai_api_
             raise HTTPException(status_code=err.response.status_code, detail=error_detail)
         raise HTTPException(status_code=500, detail="Internal Server Error")
 
-def delete_openai_assistant(assistant_id: str, openai_api_key: str = None) -> dict:
+def delete_openai_assistant(assistant_id: str, openai_api_key: str) -> dict:
     url = f"https://api.openai.com/v1/assistants/{assistant_id}"
     headers = get_headers(openai_api_key)
 
@@ -111,9 +110,11 @@ def delete_openai_assistant(assistant_id: str, openai_api_key: str = None) -> di
         response.raise_for_status()
         return response.json()
     except requests.exceptions.RequestException as err:
-        logger.error(f"Request Error: {err}")
-        raise HTTPException(status_code=err.response.status_code if err.response else 500, 
-                            detail=str(err))
+        logger.error(f"Request Error in delete_openai_assistant: {err}")
+        if err.response:
+            error_detail = err.response.json().get('error', {}).get('message', str(err))
+            raise HTTPException(status_code=err.response.status_code, detail=error_detail)
+        raise HTTPException(status_code=500, detail="Internal Server Error")
 
 def _get_tool_definitions(tools: List[Union[str, Dict[str, Any]]] = None) -> List[Dict[str, Any]]:
     if not tools:

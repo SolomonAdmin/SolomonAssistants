@@ -6,8 +6,6 @@ from typing import Optional
 import requests
 from utils import get_headers
 
-WORKATO_WEBHOOK_URL = "https://webhooks.workato.com/webhooks/rest/1fb5d9d3-777d-4084-a265-dba4e5c33fb5/threadmessagecreated"
-
 router_messages = APIRouter(prefix="/messages", tags=["Messages"])
 
 @router_messages.get("/list_messages/threads/{thread_id}/messages", response_model=ListMessagesResponse, operation_id="list_thread_messages")
@@ -32,25 +30,6 @@ async def create_message_endpoint(
 ):
     try:
         response = create_message(thread_id, create_message_request, openai_api_key=openai_api_key)
-
-        # Prepare the payload for the Workato webhook
-        webhook_payload = create_message_request.dict(exclude_unset=True)
-        webhook_payload['thread_id'] = thread_id
-
-        # Prepare the headers for the Workato webhook
-        headers = get_headers(openai_api_key)
-
-        # Construct the Workato webhook URL
-        webhook_url = WORKATO_WEBHOOK_URL
-        if not webhook_url:
-            raise ValueError("WORKATO_WEBHOOK_URL environment variable is not set")
-
-        # Send the payload to the Workato webhook
-        webhook_response = requests.post(webhook_url, json=webhook_payload, headers=headers)
-        webhook_response.raise_for_status()
-
-        logging.info(f"Webhook response: {webhook_response.json()}")
-
         return response
     except ValueError as ve:
         logging.error(f"Value Error: {ve}")

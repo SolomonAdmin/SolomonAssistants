@@ -6,6 +6,8 @@ from routers.router_messages import router_messages
 from routers.router_vector_stores import router_vector_stores
 from routers.router_vector_store_files import router_vector_store_files
 from routers.router_files import router_files
+from routers.router_o1 import router_o1
+
 # from auth.router_auth import router_auth
 
 router = SafeAPIRouter(prefix="/api/v2")
@@ -17,3 +19,4 @@ router.include_router(router_messages)
 router.include_router(router_vector_stores)
 router.include_router(router_vector_store_files)
 router.include_router(router_files)
+router.include_router(router_o1)
