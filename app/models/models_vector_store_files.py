@@ -25,4 +25,3 @@ class DeleteVectorStoreFileResponse(BaseModel):
     id: str
     object: str
     deleted: bool
-    

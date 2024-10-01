@@ -240,13 +240,25 @@ def handle_run_with_tools(run: Dict[str, Any], thread_id: str, openai_api_key: s
     return run
 
 def create_run_and_list_messages(create_thread_run_request: Dict[str, Any], openai_api_key: str = None) -> Union[List[Dict[str, Any]], Dict[str, Any]]:
+    # Log the API key (partially masked)
+    if openai_api_key:
+        logger.info(f"Using OpenAI API key: {openai_api_key}")
+    else:
+        logger.warning("No OpenAI API key provided")
+
     headers = get_headers(openai_api_key)
     
     logger.info("Creating thread")
     thread_url = "https://api.openai.com/v1/threads"
     thread_payload = {"messages": create_thread_run_request['thread']['messages']}
     thread_response = requests.post(thread_url, headers=headers, json=thread_payload)
-    thread_response.raise_for_status()
+    try:
+        thread_response.raise_for_status()
+    except requests.exceptions.HTTPError as e:
+        logger.error(f"HTTP error when creating thread: {e}")
+        logger.error(f"Response content: {thread_response.text}")
+        raise
+
     thread_id = thread_response.json()['id']
     logger.info(f"Thread created with ID: {thread_id}")
 
@@ -263,7 +275,13 @@ def create_run_and_list_messages(create_thread_run_request: Dict[str, Any], open
     
     logger.debug(f"Run payload: {run_payload}")
     run_response = requests.post(run_url, headers=headers, json=run_payload)
-    run_response.raise_for_status()
+    try:
+        run_response.raise_for_status()
+    except requests.exceptions.HTTPError as e:
+        logger.error(f"HTTP error when creating run: {e}")
+        logger.error(f"Response content: {run_response.text}")
+        raise
+
     run = run_response.json()
     logger.info(f"Run created with ID: {run['id']}")
     
@@ -279,7 +297,13 @@ def create_run_and_list_messages(create_thread_run_request: Dict[str, Any], open
         time.sleep(5)
         run_status_url = f"https://api.openai.com/v1/threads/{thread_id}/runs/{run['id']}"
         run_status_response = requests.get(run_status_url, headers=headers)
-        run_status_response.raise_for_status()
+        try:
+            run_status_response.raise_for_status()
+        except requests.exceptions.HTTPError as e:
+            logger.error(f"HTTP error when checking run status: {e}")
+            logger.error(f"Response content: {run_status_response.text}")
+            raise
+
         run = run_status_response.json()
         logger.info(f"Current run status: {run['status']}")
         
@@ -292,7 +316,13 @@ def create_run_and_list_messages(create_thread_run_request: Dict[str, Any], open
     logger.info("Listing messages")
     messages_url = f"https://api.openai.com/v1/threads/{thread_id}/messages"
     messages_response = requests.get(messages_url, headers=headers)
-    messages_response.raise_for_status()
+    try:
+        messages_response.raise_for_status()
+    except requests.exceptions.HTTPError as e:
+        logger.error(f"HTTP error when listing messages: {e}")
+        logger.error(f"Response content: {messages_response.text}")
+        raise
+
     messages = messages_response.json()
     logger.info(f"Retrieved messages")
     
