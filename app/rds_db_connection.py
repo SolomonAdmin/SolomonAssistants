@@ -58,24 +58,24 @@ class DatabaseConnector:
                 session.rollback()
                 raise
 
-def main():
-    db_connector = DatabaseConnector()
+# def main():
+#     db_connector = DatabaseConnector()
     
-    try:
-        # Example query
-        query = "SELECT TOP 10 * FROM dbo.solConnectConsumers WHERE solomon_consumer_key = :key"
-        params = {"key": "C69E685B-A783-4950-A040-414B69F61FCC"}
+#     try:
+#         # Example query
+#         query = "SELECT TOP 10 * FROM dbo.solConnectConsumers WHERE solomon_consumer_key = :key"
+#         params = {"key": "C69E685B-A783-4950-A040-414B69F61FCC"}
         
-        results = db_connector.execute_query(query, params)
+#         results = db_connector.execute_query(query, params)
         
-        if results:
-            for row in results:
-                print(row)
-        else:
-            print("No results found.")
-    except Exception as e:
-        logging.error(f"Error in main: {e}")
-        print("An error occurred while executing the query.")
+#         if results:
+#             for row in results:
+#                 print(row)
+#         else:
+#             print("No results found.")
+#     except Exception as e:
+#         logging.error(f"Error in main: {e}")
+#         print("An error occurred while executing the query.")
 
-if __name__ == '__main__':
-    main()
+# if __name__ == '__main__':
+#     main()
