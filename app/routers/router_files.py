@@ -58,7 +58,7 @@ async def list_files_endpoint(
 
         logger.info(f"Retrieved OpenAI API key: {openai_api_key[:4]}...{openai_api_key[-4:]}")  # Log partial key
 
-        response = await list_files(purpose=purpose, openai_api_key=openai_api_key)
+        response = list_files(purpose=purpose, openai_api_key=openai_api_key)
         return response
     except HTTPException as he:
         raise he
