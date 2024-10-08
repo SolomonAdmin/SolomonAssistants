@@ -5,6 +5,7 @@ from sqlalchemy.exc import SQLAlchemyError
 import urllib
 import os
 from dotenv import load_dotenv
+from typing import Any, Dict, List, Optional
 import logging
 
 class DatabaseConnector:
@@ -48,6 +49,15 @@ class DatabaseConnector:
         )
         self.Session = sessionmaker(bind=self.engine)
 
+    def test_connection(self) -> bool:
+        try:
+            with self.engine.connect() as connection:
+                result = connection.execute(text("SELECT 1"))
+                return result.scalar() == 1
+        except SQLAlchemyError as e:
+            logging.error(f"Database connection test failed: {e}")
+            return False
+
     def execute_query(self, query, params=None):
         with self.Session() as session:
             try:
@@ -57,6 +67,29 @@ class DatabaseConnector:
                 logging.error(f"Database error in execute_query: {e}")
                 session.rollback()
                 raise
+
+    def get_threads(self, solomon_consumer_key: str) -> List[Dict[str, Any]]:
+        query = text("SELECT thread_id, thread_name FROM dbo.solConnectThreads WHERE solomon_consumer_key = :key")
+        with self.Session() as session:
+            try:
+                result = session.execute(query, {"key": solomon_consumer_key})
+                return [row._asdict() for row in result.fetchall()]
+            except SQLAlchemyError as e:
+                logging.error(f"Error retrieving threads: {e}")
+                return []
+            
+
+def test_db_connection():
+    db = DatabaseConnector()
+    if db.test_connection():
+        print("Database connection successful")
+        threads = db.get_threads("C69E685B-A783-4950-A040-414B69F61FCC")
+        print(f"Retrieved threads\n\n: {threads}")
+    else:
+        print("Database connection failed")
+
+if __name__ == "__main__":
+    test_db_connection()
 
 # def main():
 #     db_connector = DatabaseConnector()
