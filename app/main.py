@@ -1,8 +1,10 @@
 import sys
 import os
 from pathlib import Path
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.openapi.utils import get_openapi
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from router import router
 from routers.healthcheck import router_health_check
 from fastapi.responses import Response
@@ -11,12 +13,6 @@ import functools
 
 # Add the parent directory to sys.path to make 'tools' module discoverable
 sys.path.append(str(Path(__file__).parent.parent))
-
-from helpers.aws_helpers import get_secret_value
-
-# Set environment variables
-os.environ["AWS_SECRET_ACCESS_KEY"] = get_secret_value("AWS_SECRET_ACCESS_KEY")
-os.environ["AWS_ACCESS_KEY_ID"] = get_secret_value("AWS_ACCESS_KEY_ID")
 
 # Initialize the FastAPI application
 app = FastAPI(title="OpenAPI Assistants V2.0", version="0.1.0")
@@ -34,12 +30,28 @@ app.add_middleware(
 app.include_router(router_health_check)
 app.include_router(router)
 
-# Optional: Customize OpenAPI schema
-@app.on_event("startup")
-async def startup_event():
-    openapi_schema = app.openapi()
-    # print(openapi_schema)
+# Customize OpenAPI schema
+def custom_openapi():
+    if app.openapi_schema:
+        return app.openapi_schema
+    openapi_schema = get_openapi(
+        title="OpenAPI Assistants V2.0",
+        version="0.1.0",
+        description="Your API description",
+        routes=app.routes,
+    )
+    openapi_schema["components"]["securitySchemes"] = {
+        "BearerAuth": {
+            "type": "http",
+            "scheme": "bearer",
+            "bearerFormat": "JWT",
+        }
+    }
+    openapi_schema["security"] = [{"BearerAuth": []}]
     app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+app.openapi = custom_openapi
 
 @app.get("/openapi.yaml")
 @functools.lru_cache()
@@ -48,10 +60,15 @@ def get_openapi_yaml() -> Response:
     yaml_output = yaml.dump(openapi_json)  # Convert JSON to YAML
     return Response(content=yaml_output, media_type="text/x-yaml")
 
-# # Optional: Add a root endpoint
-# @app.get("/")
-# async def root():
-#     return {"message": "Welcome to the API"}
+# Debug middleware to log requests
+@app.middleware("http")
+async def log_requests(request, call_next):
+    print(f"Received request: {request.method} {request.url}")
+    print("Headers:")
+    for name, value in request.headers.items():
+        print(f"{name}: {value}")
+    response = await call_next(request)
+    return response
 
 if __name__ == "__main__":
     import uvicorn
