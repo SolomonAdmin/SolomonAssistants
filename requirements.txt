@@ -99,3 +99,4 @@ psycopg2-binary
 pymysql
 SQLAlchemy
 pyodbc
+PyJWT
