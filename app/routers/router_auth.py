@@ -2,7 +2,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Header
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.security import OAuth2PasswordBearer
-from models.models_auth import UserSignUp, UserSignIn, TokenResponse, UserResponse, VerificationRequest
+from models.models_auth import UserSignUp, UserSignIn, TokenResponse, UserResponse, VerificationRequest, SolomonConsumerKeyUpdate
 from services.service_auth import CognitoService
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
@@ -77,3 +77,23 @@ async def verify_signup(verification: VerificationRequest):
             raise HTTPException(status_code=400, detail="Verification code has expired")
         else:
             raise HTTPException(status_code=500, detail=f"An error occurred: {str(e)}")
+
+@router_auth.put("/solomon-consumer-key")
+async def update_solomon_consumer_key(
+    update: SolomonConsumerKeyUpdate,
+    current_user: UserResponse = Depends(get_current_user)
+):
+    try:
+        result = await cognito_service.change_solomon_consumer_key(current_user.email, update.solomon_consumer_key)
+        if result:
+            return {"message": "Solomon consumer key updated successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"An error occurred: {str(e)}")
+
+@router_auth.get("/solomon-consumer-key")
+async def get_solomon_consumer_key(current_user: UserResponse = Depends(get_current_user)):
+    try:
+        consumer_key = await cognito_service.get_solomon_consumer_key(current_user.email)
+        return {"solomon_consumer_key": consumer_key}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"An error occurred: {str(e)}")
