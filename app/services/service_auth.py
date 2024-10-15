@@ -35,7 +35,11 @@ class CognitoService:
                 ],
                 SecretHash=self.get_secret_hash(user.email)
             )
-            return UserResponse(id=response['UserSub'], email=user.email, name=user.name)
+            return UserResponse(
+                id=response['UserSub'],
+                email=user.email,
+                name=user.name,
+            )
         except ClientError as e:
             raise Exception(f"Error signing up user: {str(e)}")
 
@@ -70,12 +74,40 @@ class CognitoService:
             return UserResponse(
                 id=response['Username'],
                 email=user_attrs.get('email'),
-                name=user_attrs.get('name')
+                name=user_attrs.get('name'),
+                solomon_consumer_key=user_attrs.get('custom:solomon_consumer_key')
             )
         except self.client.exceptions.NotAuthorizedException:
             raise Exception("Invalid or expired token")
         except ClientError as e:
             raise Exception(f"Error getting user details: {str(e)}")
+        
+    async def attach_solomon_consumer_key(self, username: str, solomon_consumer_key: str) -> bool:
+        try:
+            self.client.admin_update_user_attributes(
+                UserPoolId=self.user_pool_id,
+                Username=username,
+                UserAttributes=[
+                    {'Name': 'custom:solomon_consumer_key', 'Value': solomon_consumer_key},
+                ]
+            )
+            return True
+        except ClientError as e:
+            raise Exception(f"Error attaching Solomon consumer key: {str(e)}")
+
+    async def change_solomon_consumer_key(self, username: str, new_solomon_consumer_key: str) -> bool:
+        return await self.attach_solomon_consumer_key(username, new_solomon_consumer_key)
+
+    async def get_solomon_consumer_key(self, username: str) -> str:
+        try:
+            response = self.client.admin_get_user(
+                UserPoolId=self.user_pool_id,
+                Username=username
+            )
+            user_attrs = {attr['Name']: attr['Value'] for attr in response['UserAttributes']}
+            return user_attrs.get('custom:solomon_consumer_key')
+        except ClientError as e:
+            raise Exception(f"Error getting Solomon consumer key: {str(e)}")
     
     async def confirm_sign_up(self, verification: VerificationRequest) -> bool:
         try:
