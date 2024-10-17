@@ -126,3 +126,26 @@ class CognitoService:
                 raise Exception("Verification code has expired")
             else:
                 raise Exception(f"Error confirming sign up: {str(e)}")
+    
+    async def refresh_token(self, refresh_token: str, email: str) -> TokenResponse:
+        try:
+            response = self.client.initiate_auth(
+                ClientId=self.client_id,
+                AuthFlow='REFRESH_TOKEN_AUTH',
+                AuthParameters={
+                    'REFRESH_TOKEN': refresh_token,
+                    'SECRET_HASH': self.get_secret_hash(email)
+                }
+            )
+            auth_result = response['AuthenticationResult']
+            return TokenResponse(
+                access_token=auth_result['AccessToken'],
+                id_token=auth_result['IdToken'],
+                refresh_token=refresh_token  # Keep the original refresh token
+            )
+        except self.client.exceptions.NotAuthorizedException as e:
+            print(f"NotAuthorizedException: {str(e)}")  # Add this for debugging
+            raise Exception("Invalid or expired refresh token")
+        except ClientError as e:
+            print(f"ClientError: {str(e)}")  # Add this for debugging
+            raise Exception(f"Error refreshing token: {str(e)}")
