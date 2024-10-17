@@ -32,7 +32,7 @@ async def upload_file_endpoint(
             buffer.write(file.file.read())
 
         # Upload the file to OpenAI using the API key
-        response = await upload_file(file_path=file_location, purpose=purpose, openai_api_key=openai_api_key)
+        response = upload_file(file_path=file_location, purpose=purpose, openai_api_key=openai_api_key)
 
         # Remove the temporary file
         os.remove(file_location)
