@@ -1,10 +1,11 @@
 # routers/router_auth.py
-from fastapi import APIRouter, Depends, HTTPException, Header
+from fastapi import APIRouter, Depends, HTTPException, Header, Query
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.security import OAuth2PasswordBearer
 from models.models_auth import UserSignUp, UserSignIn, TokenResponse, UserResponse, VerificationRequest, SolomonConsumerKeyUpdate
 from services.service_auth import CognitoService
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from botocore.exceptions import ClientError
 
 security = HTTPBearer()
 
@@ -97,3 +98,20 @@ async def get_solomon_consumer_key(current_user: UserResponse = Depends(get_curr
         return {"solomon_consumer_key": consumer_key}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"An error occurred: {str(e)}")
+    
+@router_auth.post("/refresh-token", response_model=TokenResponse)
+async def refresh_token(refresh_token: str = Query(...), email: str = Query(...)):
+    try:
+        token_response = await cognito_service.refresh_token(refresh_token, email)
+        return token_response
+    except Exception as e:
+        raise HTTPException(status_code=401, detail=str(e))
+    
+@router_auth.post("/logout")
+async def logout(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    try:
+        token = credentials.credentials
+        cognito_service.client.global_sign_out(AccessToken=token)
+        return {"message": "Logged out successfully"}
+    except ClientError as e:
+        raise HTTPException(status_code=500, detail=f"Error logging out: {str(e)}")
