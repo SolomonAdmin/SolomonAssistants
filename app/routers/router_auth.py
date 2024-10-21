@@ -6,6 +6,7 @@ from models.models_auth import UserSignUp, UserSignIn, TokenResponse, UserRespon
 from services.service_auth import CognitoService
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from botocore.exceptions import ClientError
+from rds_db_connection import DatabaseConnector 
 
 security = HTTPBearer()
 
@@ -13,6 +14,7 @@ router_auth = APIRouter(tags=["Auth"])
 cognito_service = CognitoService()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 security = HTTPBearer()
+db_connector = DatabaseConnector()  
 
 # Dependency to get the token
 async def get_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
@@ -58,10 +60,25 @@ async def get_token(authorization: str = Header(None)):
 async def get_user_info(authorization: str = Header(...)):
     if not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Invalid authorization header")
+    
     token = authorization.split(" ")[1]
+    
     try:
-        user = await cognito_service.get_user(token)
-        return user
+        # Step 1: Retrieve user data from Cognito
+        cognito_user = await cognito_service.get_user(token)
+        
+        # Step 2: Fetch Solomon consumer key from the database
+        solomon_consumer_key = db_connector.get_consumer_key_by_email(cognito_user.email)
+        
+        # Step 3: Combine the data and create the final response
+        user_response = UserResponse(
+            id=cognito_user.id,
+            email=cognito_user.email,
+            name=cognito_user.name,
+            solomon_consumer_key=solomon_consumer_key
+        )
+        
+        return user_response
     except Exception as e:
         raise HTTPException(status_code=401, detail=str(e))
 
@@ -82,14 +99,26 @@ async def verify_signup(verification: VerificationRequest):
 @router_auth.put("/solomon-consumer-key")
 async def update_solomon_consumer_key(
     update: SolomonConsumerKeyUpdate,
-    current_user: UserResponse = Depends(get_current_user)
+    authorization: str = Header(...)
 ):
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid authorization header")
+    
+    token = authorization.split(" ")[1]
+    
     try:
-        result = await cognito_service.change_solomon_consumer_key(current_user.email, update.solomon_consumer_key)
-        if result:
+        # Step 1: Retrieve user data from Cognito
+        cognito_user = await cognito_service.get_user(token)
+        
+        # Step 2: Update Solomon consumer key in the database
+        success = db_connector.update_solomon_consumer_key(cognito_user.email, update.solomon_consumer_key)
+        
+        if success:
             return {"message": "Solomon consumer key updated successfully"}
+        else:
+            raise HTTPException(status_code=404, detail="User not found or update failed")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"An error occurred: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router_auth.get("/solomon-consumer-key")
 async def get_solomon_consumer_key(current_user: UserResponse = Depends(get_current_user)):
