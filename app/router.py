@@ -9,10 +9,13 @@ from routers.router_files import router_files
 from routers.router_o1 import router_o1
 from routers.router_threads import router_threads
 from routers.router_auth import router_auth
+from routers.router_tools import tool_available_router 
+
 
 router = SafeAPIRouter(prefix="/api/v2")
 
 router.include_router(router_assistant)
+router.include_router(tool_available_router)
 router.include_router(router_runs)
 router.include_router(router_messages)
 router.include_router(router_vector_stores)
