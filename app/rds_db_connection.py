@@ -77,14 +77,50 @@ class DatabaseConnector:
             except SQLAlchemyError as e:
                 logging.error(f"Error retrieving threads: {e}")
                 return []
+    
+    def get_consumer_key_by_email(self, email: str) -> Optional[str]:
+        query = text("SELECT TOP 1 solomon_consumer_key FROM dbo.solConnectConsumers WHERE customer_email = :email")
+        with self.Session() as session:
+            try:
+                result = session.execute(query, {"email": email})
+                row = result.fetchone()
+                return row[0] if row else None
+            except SQLAlchemyError as e:
+                logging.error(f"Error retrieving consumer key by email: {e}")
+                return None
+            
+    def update_solomon_consumer_key(self, email: str, new_key: str) -> bool:
+        query = text("UPDATE dbo.solConnectConsumers SET solomon_consumer_key = :new_key WHERE customer_email = :email")
+        with self.Session() as session:
+            try:
+                result = session.execute(query, {"email": email, "new_key": new_key})
+                session.commit()
+                if result.rowcount == 0:
+                    logging.warning(f"No record found for email: {email}")
+                    return False
+                return True
+            except SQLAlchemyError as e:
+                logging.error(f"Error updating Solomon consumer key: {e}")
+                session.rollback()
+                return False
             
 
 def test_db_connection():
     db = DatabaseConnector()
     if db.test_connection():
         print("Database connection successful")
-        threads = db.get_threads("C69E685B-A783-4950-A040-414B69F61FCC")
-        print(f"Retrieved threads\n\n: {threads}")
+        
+        # # Test get_threads method
+        # threads = db.get_threads("C69E685B-A783-4950-A040-414B69F61FCC")
+        # print(f"Retrieved threads: {threads}")
+        
+        # Test get_consumer_key_by_email method
+        test_email = "jsturgis@solomonconsult.com"
+        consumer_key = db.get_consumer_key_by_email(test_email)
+        if consumer_key:
+            print(f"Consumer key for {test_email}: {consumer_key}")
+        else:
+            print(f"No consumer key found for {test_email}")
     else:
         print("Database connection failed")
 
