@@ -7,6 +7,11 @@ from services.service_auth import CognitoService
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from botocore.exceptions import ClientError
 from rds_db_connection import DatabaseConnector 
+import logging
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 security = HTTPBearer()
 
@@ -95,39 +100,7 @@ async def verify_signup(verification: VerificationRequest):
             raise HTTPException(status_code=400, detail="Verification code has expired")
         else:
             raise HTTPException(status_code=500, detail=f"An error occurred: {str(e)}")
-
-@router_auth.put("/solomon-consumer-key")
-async def update_solomon_consumer_key(
-    update: SolomonConsumerKeyUpdate,
-    authorization: str = Header(...)
-):
-    if not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
-    
-    token = authorization.split(" ")[1]
-    
-    try:
-        # Step 1: Retrieve user data from Cognito
-        cognito_user = await cognito_service.get_user(token)
         
-        # Step 2: Update Solomon consumer key in the database
-        success = db_connector.update_solomon_consumer_key(cognito_user.email, update.solomon_consumer_key)
-        
-        if success:
-            return {"message": "Solomon consumer key updated successfully"}
-        else:
-            raise HTTPException(status_code=404, detail="User not found or update failed")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@router_auth.get("/solomon-consumer-key")
-async def get_solomon_consumer_key(current_user: UserResponse = Depends(get_current_user)):
-    try:
-        consumer_key = await cognito_service.get_solomon_consumer_key(current_user.email)
-        return {"solomon_consumer_key": consumer_key}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"An error occurred: {str(e)}")
-    
 @router_auth.post("/refresh-token", response_model=TokenResponse)
 async def refresh_token(refresh_token: str = Query(...), email: str = Query(...)):
     try:
@@ -144,3 +117,79 @@ async def logout(credentials: HTTPAuthorizationCredentials = Depends(security)):
         return {"message": "Logged out successfully"}
     except ClientError as e:
         raise HTTPException(status_code=500, detail=f"Error logging out: {str(e)}")
+    
+@router_auth.get("/consumer-key", response_model=dict)
+async def get_consumer_key(
+    authorization: str = Header(...),
+):
+    """
+    Get the solomon consumer key for the authenticated user.
+    Requires Bearer token authentication.
+    """
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid authorization header")
+    
+    token = authorization.split(" ")[1]
+    
+    try:
+        # Step 1: Validate token and get user from Cognito
+        cognito_user = await cognito_service.get_user(token)
+        
+        # Step 2: Get consumer key from RDS
+        consumer_key = db_connector.get_consumer_key_by_email(cognito_user.email)
+        
+        if consumer_key is None:
+            logger.warning(f"No consumer key found for user: {cognito_user.email}")
+            raise HTTPException(status_code=404, detail="Consumer key not found")
+            
+        return {"solomon_consumer_key": consumer_key}
+        
+    except Exception as e:
+        logger.error(f"Error retrieving consumer key: {str(e)}")
+        if "Invalid or expired token" in str(e):
+            raise HTTPException(status_code=401, detail="Invalid or expired token")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+@router_auth.put("/consumer-key")
+async def update_consumer_key(
+    update: SolomonConsumerKeyUpdate,
+    authorization: str = Header(...),
+):
+    """
+    Update the solomon consumer key for the authenticated user in RDS database.
+    Requires Bearer token authentication.
+    """
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid authorization header")
+    
+    token = authorization.split(" ")[1]
+    
+    try:
+        # Step 1: Validate token and get user from Cognito
+        cognito_user = await cognito_service.get_user(token)
+        logger.info(f"Updating consumer key for user: {cognito_user.email}")
+        
+        # Step 2: Update consumer key in RDS
+        success = db_connector.update_solomon_consumer_key(
+            cognito_user.email, 
+            update.solomon_consumer_key
+        )
+        
+        if not success:
+            logger.warning(f"Failed to update consumer key for user: {cognito_user.email}")
+            raise HTTPException(
+                status_code=404,
+                detail="User not found in database or update failed"
+            )
+            
+        logger.info(f"Successfully updated consumer key for user: {cognito_user.email}")
+        return {
+            "message": "Solomon consumer key updated successfully",
+            "email": cognito_user.email
+        }
+        
+    except Exception as e:
+        logger.error(f"Error updating consumer key: {str(e)}")
+        if "Invalid or expired token" in str(e):
+            raise HTTPException(status_code=401, detail="Invalid or expired token")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
