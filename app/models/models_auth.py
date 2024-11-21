@@ -28,3 +28,6 @@ class VerificationRequest(BaseModel):
 
 class SolomonConsumerKeyUpdate(BaseModel):
     solomon_consumer_key: str
+
+class WorkspacesResponse(BaseModel):
+    workspace_names: list[str]

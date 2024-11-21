@@ -61,3 +61,20 @@ class DBService:
         except SQLAlchemyError as e:
             logging.error(f"Database error in get_consumer_info: {str(e)}")
             raise Exception(f"Database error: {str(e)}")
+
+    @staticmethod
+    async def get_workspace_names_by_email(email: str) -> list[str]:
+        db_connector = DatabaseConnector()
+        try:
+            query = """
+                SELECT workspace_name
+                FROM dbo.solConnectUsers 
+                WHERE customer_email = :email
+            """
+            result = db_connector.execute_query(query, {"email": email})
+            if result:
+                return [row[0] for row in result]  # Just return the workspace names
+            return []
+        except SQLAlchemyError as e:
+            logging.error(f"Database error in get_workspace_names_by_email: {str(e)}")
+            raise Exception(f"Database error: {str(e)}")

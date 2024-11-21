@@ -2,7 +2,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Header, Query
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.security import OAuth2PasswordBearer
-from models.models_auth import UserSignUp, UserSignIn, TokenResponse, UserResponse, VerificationRequest, SolomonConsumerKeyUpdate
+from models.models_auth import UserSignUp, UserSignIn, TokenResponse, UserResponse, VerificationRequest, SolomonConsumerKeyUpdate, WorkspacesResponse
 from services.service_auth import CognitoService
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from botocore.exceptions import ClientError
@@ -190,6 +190,32 @@ async def update_consumer_key(
         
     except Exception as e:
         logger.error(f"Error updating consumer key: {str(e)}")
+        if "Invalid or expired token" in str(e):
+            raise HTTPException(status_code=401, detail="Invalid or expired token")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+@router_auth.get("/workspaces", response_model=WorkspacesResponse)
+async def get_user_workspaces(authorization: str = Header(...)):
+    """
+    Get all workspace names available to the authenticated user.
+    Uses the user's Cognito email to query the solConnectUsers table.
+    """
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid authorization header")
+    
+    token = authorization.split(" ")[1]
+    
+    try:
+        # Step 1: Get user email from Cognito
+        cognito_user = await cognito_service.get_user(token)
+        
+        # Step 2: Get workspace names from database using email
+        workspace_names = db_connector.get_workspaces_by_email(cognito_user.email)
+        
+        return WorkspacesResponse(workspace_names=workspace_names)
+        
+    except Exception as e:
+        logger.error(f"Error retrieving workspaces: {str(e)}")
         if "Invalid or expired token" in str(e):
             raise HTTPException(status_code=401, detail="Invalid or expired token")
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")

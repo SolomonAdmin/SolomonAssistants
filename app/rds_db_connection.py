@@ -103,6 +103,22 @@ class DatabaseConnector:
                 logging.error(f"Error updating Solomon consumer key: {e}")
                 session.rollback()
                 return False
+    
+    def get_workspaces_by_email(self, email: str) -> list[str]:
+        query = text("""
+            SELECT workspace_name
+            FROM dbo.solConnectUsers 
+            WHERE customer_email = :email
+        """)
+        
+        with self.Session() as session:
+            try:
+                result = session.execute(query, {"email": email})
+                # Extract just the workspace_name values from the result
+                return [row[0] for row in result]
+            except SQLAlchemyError as e:
+                logging.error(f"Error retrieving workspaces by email: {e}")
+                return []
             
 
 def test_db_connection():
