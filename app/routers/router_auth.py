@@ -219,3 +219,44 @@ async def get_user_workspaces(authorization: str = Header(...)):
         if "Invalid or expired token" in str(e):
             raise HTTPException(status_code=401, detail="Invalid or expired token")
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+@router_auth.get("/workspace-key/{workspace_name}", response_model=dict)
+async def get_workspace_consumer_key(
+    workspace_name: str,
+    authorization: str = Header(...)
+):
+    """
+    Get the solomon consumer key for a specific workspace.
+    Requires Bearer token authentication.
+    """
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid authorization header")
+    
+    token = authorization.split(" ")[1]
+    
+    try:
+        # Step 1: Get user from Cognito
+        cognito_user = await cognito_service.get_user(token)
+        
+        # Step 2: Get consumer key for workspace
+        consumer_key = db_connector.get_consumer_key_by_email_and_workspace(
+            cognito_user.email,
+            workspace_name
+        )
+        
+        if not consumer_key:
+            raise HTTPException(
+                status_code=404, 
+                detail="Consumer key not found for this workspace"
+            )
+            
+        return {"solomon_consumer_key": consumer_key}
+        
+    except Exception as e:
+        logger.error(f"Error retrieving workspace consumer key: {str(e)}")
+        if "Invalid or expired token" in str(e):
+            raise HTTPException(status_code=401, detail="Invalid or expired token")
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Internal server error: {str(e)}"
+        )

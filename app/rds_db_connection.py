@@ -119,6 +119,26 @@ class DatabaseConnector:
             except SQLAlchemyError as e:
                 logging.error(f"Error retrieving workspaces by email: {e}")
                 return []
+    
+    def get_consumer_key_by_email_and_workspace(self, email: str, workspace_name: str) -> Optional[str]:
+        query = text("""
+            SELECT solomon_consumer_key
+            FROM dbo.solConnectUsers 
+            WHERE customer_email = :email 
+            AND workspace_name = :workspace_name
+        """)
+        
+        with self.Session() as session:
+            try:
+                result = session.execute(query, {
+                    "email": email,
+                    "workspace_name": workspace_name
+                })
+                row = result.fetchone()
+                return row[0] if row else None
+            except SQLAlchemyError as e:
+                logging.error(f"Error retrieving consumer key: {e}")
+                return None
             
 
 def test_db_connection():
