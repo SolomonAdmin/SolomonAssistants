@@ -1,8 +1,9 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException, Form, Query, Header
-from models.models_files import UploadFileResponse, ListFilesResponse
-from services.service_files import upload_file, list_files
+from models.models_files import UploadFileResponse, ListFilesResponse, FileContentUploadRequest, FileContentUploadResponse
+from services.service_files import upload_file, list_files, upload_file_content
 import logging
 import os
+import tempfile
 from typing import Optional
 from services.service_db import DBService
 import logging
@@ -64,4 +65,33 @@ async def list_files_endpoint(
         raise he
     except Exception as e:
         logger.exception(f"Error in list_files_endpoint: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
+
+@router_files.post("/upload_file_workato", response_model=FileContentUploadResponse, operation_id="upload_file_content")
+async def upload_file_content_endpoint(
+    request: FileContentUploadRequest,
+    solomon_consumer_key: str = Header(..., description="Solomon Consumer Key for authentication")
+):
+    try:
+        openai_api_key = await DBService.get_openai_api_key(solomon_consumer_key)
+        
+        if not openai_api_key:
+            raise HTTPException(status_code=401, detail="Invalid Solomon Consumer Key")
+
+        with tempfile.NamedTemporaryFile(mode='w+', suffix=f'.{request.file_type}', delete=False) as temp_file:
+            temp_file.write(request.content)
+            temp_file.flush()
+            
+            response = upload_file_content(
+                file_path=temp_file.name,
+                file_name=request.file_name,
+                purpose=request.purpose,
+                openai_api_key=openai_api_key
+            )
+            
+        os.remove(temp_file.name)
+        return response
+        
+    except Exception as e:
+        logger.exception(f"Error in upload_file_content_endpoint: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
