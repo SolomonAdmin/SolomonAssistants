@@ -23,3 +23,17 @@ class UploadFileResponse(BaseModel):
 class ListFilesResponse(BaseModel):
     data: List[UploadFileResponse]
     object: str
+
+class FileContentUploadRequest(BaseModel):
+    content: str
+    file_name: str
+    file_type: str
+    purpose: str = "assistants"
+
+class FileContentUploadResponse(BaseModel):
+    id: str
+    object: str
+    bytes: int
+    created_at: int
+    filename: str
+    purpose: str

@@ -1,6 +1,6 @@
 import requests
 import logging
-from models.models_files import UploadFileResponse, ListFilesResponse
+from models.models_files import UploadFileResponse, ListFilesResponse, FileContentUploadResponse
 from typing import Optional
 
 def upload_file(file_path: str, openai_api_key: str, purpose: str = "assistants") -> UploadFileResponse:
@@ -61,3 +61,24 @@ def list_files(purpose: Optional[str] = None, openai_api_key: str = None) -> Lis
     except requests.exceptions.RequestException as err:
         logging.error(f"Request Error: {err}")
         raise
+
+def upload_file_content(file_path: str, file_name: str, openai_api_key: str, purpose: str = "assistants") -> FileContentUploadResponse:
+    url = "https://api.openai.com/v1/files"
+    
+    headers = {
+        "Authorization": f"Bearer {openai_api_key}"
+    }
+    
+    with open(file_path, 'rb') as f:
+        files = {
+            'file': (file_name, f, 'application/octet-stream'),
+            'purpose': (None, purpose)
+        }
+        
+        try:
+            response = requests.post(url, headers=headers, files=files)
+            response.raise_for_status()
+            return FileContentUploadResponse(**response.json())
+        except requests.exceptions.RequestException as err:
+            logging.error(f"Request Error: {err}")
+            raise
