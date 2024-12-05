@@ -88,28 +88,34 @@ async def get_openai_assistants_endpoint(
         logging.error(f"Error in get_openai_assistants endpoint: {e}")
         return JSONResponse(status_code=500, content={"detail": "Internal Server Error"})
     
-@router_assistant.post("/modify_assistant/{assistant_id}", response_model=AssistantResponse, operation_id="modify_assistant")
+@router_assistant.post("/modify_assistant/{assistant_id}", response_model=AssistantResponse)
 async def modify_assistant(
     assistant_id: str = Path(..., description="The ID of the assistant to modify"),
-    request: ModifyAssistantRequest = Body(None, description="The modifications to apply to the assistant"),
+    request: ModifyAssistantRequest = Body(..., description="The modifications to apply to the assistant"),
     solomon_consumer_key: str = Header(..., description="Solomon Consumer Key for authentication")
 ) -> AssistantResponse:
     """
-    Modify an existing assistant.
+    Modify an existing assistant with support for tools and tool resources.
     """
     try:
-        # Retrieve the OpenAI API key using the solomon_consumer_key
         openai_api_key = await DBService.get_openai_api_key(solomon_consumer_key)
         
         if not openai_api_key:
             raise HTTPException(status_code=401, detail="Invalid Solomon Consumer Key")
 
-        modifications = request.dict(exclude_unset=True) if request else {}
-        response = modify_openai_assistant(assistant_id, modifications, openai_api_key=openai_api_key)
+        # Convert the request to a dict and remove None values
+        modifications = request.dict(exclude_unset=True)
+        
+        response = modify_openai_assistant(
+            assistant_id=assistant_id, 
+            data=modifications,
+            openai_api_key=openai_api_key
+        )
+        
         return AssistantResponse(**response)
     except Exception as e:
         logging.error(f"Error in modify_assistant endpoint: {e}")
-        raise HTTPException(status_code=500, detail="Internal Server Error")
+        raise HTTPException(status_code=500, detail=str(e))
     
 @router_assistant.delete("/delete_assistant/{assistant_id}", response_model=DeleteAssistantResponse, operation_id="delete_assistant")
 async def delete_assistant(

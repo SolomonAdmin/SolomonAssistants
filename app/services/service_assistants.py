@@ -78,20 +78,38 @@ def modify_openai_assistant(assistant_id: str, data: Dict[str, Any], openai_api_
     url = f"https://api.openai.com/v1/assistants/{assistant_id}"
     headers = get_headers(openai_api_key)
     
-    if not data:
-        # If no modifications are provided, just fetch and return the current assistant data
-        return get_openai_assistant(assistant_id, openai_api_key)
+    # Convert the incoming data to a format OpenAI expects
+    payload = {}
     
-    # If tools are being updated, ensure they're in the correct format
-    if 'tools' in data:
-        data['tools'] = [{"type": tool.type} for tool in data['tools']]
+    # Copy basic fields
+    for field in ['name', 'description', 'instructions', 'model', 'metadata', 
+                 'file_ids', 'temperature', 'top_p', 'response_format']:
+        if field in data and data[field] is not None:
+            payload[field] = data[field]
     
-    # If tool_resources are being updated, ensure they're in the correct format
-    if 'tool_resources' in data and data['tool_resources']:
-        data['tool_resources'] = data['tool_resources'].dict(exclude_unset=True)
+    # Handle tools and tool_resources
+    if 'tools' in data and data['tools'] is not None:
+        payload['tools'] = data['tools']
+        
+    if 'tool_resources' in data and data['tool_resources'] is not None:
+        tool_resources = {}
+        
+        # Access dictionary keys directly
+        if 'code_interpreter' in data['tool_resources']:
+            tool_resources['code_interpreter'] = {
+                'file_ids': data['tool_resources']['code_interpreter']['file_ids']
+            }
+            
+        if 'file_search' in data['tool_resources']:
+            tool_resources['file_search'] = {
+                'vector_store_ids': data['tool_resources']['file_search']['vector_store_ids']
+            }
+            
+        if tool_resources:
+            payload['tool_resources'] = tool_resources
     
     try:
-        response = requests.post(url, headers=headers, json=data)
+        response = requests.post(url, headers=headers, json=payload)
         response.raise_for_status()
         return response.json()
     except requests.exceptions.RequestException as err:
