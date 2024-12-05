@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Query, Header
-from models.models_vector_store_files import CreateVectorStoreFileRequest, VectorStoreFileResponse, ListVectorStoreFilesResponse, DeleteVectorStoreFileResponse
-from services.service_vector_store_files import create_vector_store_file, list_vector_store_files, delete_vector_store_file, retrieve_vector_store_file
+from models.models_vector_store_files import CreateVectorStoreFileRequest, VectorStoreFileResponse, ListVectorStoreFilesResponse, DeleteVectorStoreFileResponse, CreateVectorStoreFileWorkatoRequest
+from services.service_vector_store_files import create_vector_store_file, list_vector_store_files, delete_vector_store_file, retrieve_vector_store_file, create_vector_store_file_workato
 from services.service_db import DBService
 from typing import Optional
 import logging
@@ -102,4 +102,27 @@ async def retrieve_vector_store_file_endpoint(
         raise HTTPException(status_code=e.response.status_code, detail=e.response.text)
     except Exception as e:
         logger.error(f"Error in retrieve_vector_store_file_endpoint: {e}")
+        raise HTTPException(status_code=500, detail="Internal Server Error")
+    
+@router_vector_store_files.post(
+    "/create_vector_store_file_workato/{vector_store_id}/files",
+    response_model=VectorStoreFileResponse,
+    operation_id="create_vector_store_file_workato"
+)
+async def create_vector_store_file_workato_endpoint(
+    vector_store_id: str,
+    request: CreateVectorStoreFileWorkatoRequest,
+    solomon_consumer_key: str = Header(..., description="Solomon Consumer Key for authentication")
+):
+    try:
+        openai_api_key = await DBService.get_openai_api_key(solomon_consumer_key)
+        if not openai_api_key:
+            raise HTTPException(status_code=401, detail="Invalid Solomon Consumer Key")
+            
+        return create_vector_store_file_workato(vector_store_id, request, openai_api_key)
+    except requests.exceptions.HTTPError as e:
+        logger.error(f"HTTP error occurred: {e}")
+        raise HTTPException(status_code=e.response.status_code, detail=e.response.text)
+    except Exception as e:
+        logger.error(f"Error in create_vector_store_file_workato_endpoint: {e}")
         raise HTTPException(status_code=500, detail="Internal Server Error")

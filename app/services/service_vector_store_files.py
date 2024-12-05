@@ -1,6 +1,6 @@
 import requests
 import logging
-from models.models_vector_store_files import CreateVectorStoreFileRequest, VectorStoreFileResponse, ListVectorStoreFilesResponse, DeleteVectorStoreFileResponse
+from models.models_vector_store_files import CreateVectorStoreFileRequest, VectorStoreFileResponse, ListVectorStoreFilesResponse, DeleteVectorStoreFileResponse, CreateVectorStoreFileWorkatoRequest
 import os
 from typing import Optional
 
@@ -119,3 +119,33 @@ def retrieve_vector_store_file(vector_store_id: str, file_id: str) -> VectorStor
     except requests.exceptions.RequestException as err:
         logging.error(f"Request Error: {err}")
         raise
+
+def create_vector_store_file_workato(
+    vector_store_id: str,
+    request: CreateVectorStoreFileWorkatoRequest,
+    openai_api_key: str
+) -> VectorStoreFileResponse:
+    url = f"https://api.openai.com/v1/vector_stores/{vector_store_id}/files"
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {openai_api_key}",
+        "OpenAI-Beta": "assistants=v2"
+    }
+
+    with tempfile.NamedTemporaryFile(mode='w+', suffix=f'.{request.file_type}', delete=False) as temp_file:
+        temp_file.write(request.content)
+        temp_file.flush()
+        
+        file_path = temp_file.name
+        files = {'file': (request.file_name, open(file_path, 'rb'))}
+        
+        try:
+            response = requests.post(url, headers=headers, files=files)
+            response.raise_for_status()
+            os.remove(file_path)
+            return VectorStoreFileResponse(**response.json())
+        except requests.exceptions.RequestException as err:
+            logging.error(f"Request Error: {err}")
+            if os.path.exists(file_path):
+                os.remove(file_path)
+            raise
