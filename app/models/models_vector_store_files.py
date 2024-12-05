@@ -1,6 +1,7 @@
 from typing import Optional
 from pydantic import BaseModel
 from typing import List
+from enum import Enum
 
 class CreateVectorStoreFileRequest(BaseModel):
     file_id: str
@@ -25,3 +26,15 @@ class DeleteVectorStoreFileResponse(BaseModel):
     id: str
     object: str
     deleted: bool
+
+class FileType(str, Enum):
+    TXT = "txt"
+    CSV = "csv"
+    JSON = "json"
+    JSONL = "jsonl"
+    PDF = "pdf"
+
+class CreateVectorStoreFileWorkatoRequest(BaseModel):
+    content: str
+    file_name: str
+    file_type: FileType
