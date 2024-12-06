@@ -1,19 +1,15 @@
-from typing import Dict, Any
-import requests
-
-class ListAssistantsTool:
-    def execute(self, limit: int = 20, order: str = "desc") -> Dict[str, Any]:
+class ListAssistantsTool(BaseTool):
+    def execute(self, limit: int = 20, order: str = "desc", solomon_consumer_key: str = None) -> Dict[str, Any]:
         """
         Sends a GET request to list all assistants.
 
         :param limit: A limit on the number of objects to be returned (between 1 and 100)
         :param order: Sort order by created_at timestamp ('asc' or 'desc')
+        :param solomon_consumer_key: User's unique API key for authentication
         :return: The response from the API as a dictionary
         """
-        url = 'https://55gdlc2st8.execute-api.us-east-1.amazonaws.com/assistant/list_assistants'
-        headers = {
-            'Content-Type': 'application/json'
-        }
+        url = f'{self.base_url}/assistant/list_assistants'
+        headers = self.get_headers(solomon_consumer_key)
         params = {
             'limit': limit,
             'order': order
@@ -42,8 +38,13 @@ class ListAssistantsTool:
                             "description": "Sort order by the created_at timestamp of the objects.",
                             "enum": ["asc", "desc"],
                             "default": "desc"
+                        },
+                        "solomon_consumer_key": {
+                            "type": "string",
+                            "description": "User's unique API key for authentication."
                         }
-                    }
+                    },
+                    "required": ["solomon_consumer_key"]
                 }
             }
         }
