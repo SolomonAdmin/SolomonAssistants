@@ -1,3 +1,7 @@
+from typing import Dict, Any
+import requests
+from .base_assistant import BaseTool
+
 class ListAssistantsTool(BaseTool):
     def execute(self, limit: int = 20, order: str = "desc", solomon_consumer_key: str = None) -> Dict[str, Any]:
         """
