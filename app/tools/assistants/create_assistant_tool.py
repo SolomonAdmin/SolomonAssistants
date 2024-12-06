@@ -1,26 +1,38 @@
 from typing import Dict, Any
 import requests
+from .base_assistant import BaseTool
 
-class CreateAssistantTool:
-    def execute(self, name: str, instructions: str, model: str) -> Dict[str, Any]:
+class CreateAssistantTool(BaseTool):
+    def execute(self, name: str, instructions: str, model: str, solomon_consumer_key: str) -> Dict[str, Any]:
         """
-        Sends a POST request to create a new assistant.
+        Creates a new assistant.
 
         :param name: The name of the assistant
         :param instructions: The instructions for the assistant
-        :param model: The model to use for the assistant
-        :return: The response from the API as a dictionary
+        :param model: The model to use
+        :param solomon_consumer_key: User's unique API key
+        :return: The response from the API
         """
-        url = 'https://55gdlc2st8.execute-api.us-east-1.amazonaws.com/assistant/create_assistant'
-        headers = {
-            'Content-Type': 'application/json'
-        }
+        url = f'{self.base_url}/assistant/create_assistant'
+        headers = self.get_headers(solomon_consumer_key)
+        
         data = {
+            'model': model,
             'name': name,
             'instructions': instructions,
-            'model': model
+            'metadata': {
+                'created_by': 'system',
+                'purpose': 'assistant_management',
+                'version': '1.0'
+            },
+            'temperature': 0.2,
+            'top_p': 0.95,
+            'response_format': {
+                'type': 'text'
+            }
         }
-        response = requests.post(url, json=data, headers=headers)
+        
+        response = requests.post(url, headers=headers, json=data)
         return response.json()
 
     def get_definition(self) -> Dict[str, Any]:
@@ -43,9 +55,13 @@ class CreateAssistantTool:
                         "model": {
                             "type": "string",
                             "description": "The model to use for the assistant (e.g., 'gpt-4')."
+                        },
+                        "solomon_consumer_key": {
+                            "type": "string",
+                            "description": "User's unique API key for authentication."
                         }
                     },
-                    "required": ["name", "instructions", "model"]
+                    "required": ["name", "instructions", "model", "solomon_consumer_key"]
                 }
             }
         }
