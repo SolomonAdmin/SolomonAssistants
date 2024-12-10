@@ -176,3 +176,26 @@ def get_openai_assistant(assistant_id: str, openai_api_key: str = None) -> dict:
 def update_assistant_tools(assistant_id: str, tools: List[str], openai_api_key: str = None) -> dict:
     tool_definitions = _get_tool_definitions(tools)
     return modify_openai_assistant(assistant_id, {"tools": tool_definitions}, openai_api_key)
+
+def get_openai_assistant(assistant_id: str, openai_api_key: str) -> dict:
+    """
+    Retrieve a specific assistant from OpenAI.
+    
+    Args:
+        assistant_id (str): The ID of the assistant to retrieve
+        openai_api_key (str): OpenAI API key for authentication
+        
+    Returns:
+        dict: The assistant object from OpenAI's response
+    """
+    
+    url = f"https://api.openai.com/v1/assistants/{assistant_id}"
+    headers = get_headers(openai_api_key)
+    
+    try:
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        logging.error(f"Error retrieving OpenAI assistant: {e}")
+        raise e
