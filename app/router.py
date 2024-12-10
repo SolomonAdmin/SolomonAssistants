@@ -10,7 +10,7 @@ from routers.router_o1 import router_o1
 from routers.router_threads import router_threads
 from routers.router_auth import router_auth
 from routers.router_tools import tool_available_router 
-
+from routers.router_assistant_builder_threads import router_assistant_builder_threads
 
 router = SafeAPIRouter(prefix="/api/v2")
 
@@ -24,3 +24,4 @@ router.include_router(router_files)
 router.include_router(router_o1)
 router.include_router(router_threads)
 router.include_router(router_auth)
+router.include_router(router_assistant_builder_threads)

@@ -139,7 +139,56 @@ class DatabaseConnector:
             except SQLAlchemyError as e:
                 logging.error(f"Error retrieving consumer key: {e}")
                 return None
-            
+
+    def get_assistant_builder_threads(self, solomon_consumer_key: str) -> List[Dict[str, Any]]:
+        query = text("""
+            SELECT thread_id, thread_name 
+            FROM dbo.solConnect_AssistantBuilderThreads 
+            WHERE solomon_consumer_key = :key
+        """)
+        with self.Session() as session:
+            try:
+                result = session.execute(query, {"key": solomon_consumer_key})
+                return [row._asdict() for row in result.fetchall()]
+            except SQLAlchemyError as e:
+                logging.error(f"Error retrieving assistant builder threads: {e}")
+                return []
+
+    def create_assistant_builder_thread(self, solomon_consumer_key: str, thread_id: str, thread_name: str) -> bool:
+        query = text("""
+            INSERT INTO dbo.solConnect_AssistantBuilderThreads 
+            (solomon_consumer_key, thread_id, thread_name)
+            VALUES (:solomon_consumer_key, :thread_id, :thread_name)
+        """)
+        with self.Session() as session:
+            try:
+                session.execute(query, {
+                    "solomon_consumer_key": solomon_consumer_key,
+                    "thread_id": thread_id,
+                    "thread_name": thread_name
+                })
+                session.commit()
+                return True
+            except SQLAlchemyError as e:
+                logging.error(f"Error creating assistant builder thread: {e}")
+                session.rollback()
+                return False
+
+    def delete_assistant_builder_thread(self, thread_id: str) -> bool:
+        query = text("""
+            DELETE FROM dbo.solConnect_AssistantBuilderThreads
+            WHERE thread_id = :thread_id
+        """)
+        with self.Session() as session:
+            try:
+                result = session.execute(query, {"thread_id": thread_id})
+                session.commit()
+                return result.rowcount > 0
+            except SQLAlchemyError as e:
+                logging.error(f"Error deleting assistant builder thread: {e}")
+                session.rollback()
+                return False
+                
 
 def test_db_connection():
     db = DatabaseConnector()
