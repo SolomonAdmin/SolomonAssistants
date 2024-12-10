@@ -15,7 +15,7 @@ from models.models_assistants import (
     DeleteAssistantResponse
 )
 from services.service_db import DBService
-from services.service_assistants import create_assistant_service, list_openai_assistants, modify_openai_assistant, delete_openai_assistant, create_assistant_with_tools
+from services.service_assistants import create_assistant_service, list_openai_assistants, modify_openai_assistant, delete_openai_assistant, create_assistant_with_tools, get_openai_assistant
 import logging
 from typing import Optional
 from tools import tool_registry
@@ -133,4 +133,22 @@ async def delete_assistant(
         return DeleteAssistantResponse(**response)
     except Exception as e:
         logging.error(f"Error in delete_assistant endpoint: {e}")
+        raise HTTPException(status_code=500, detail="Internal Server Error")
+
+@router_assistant.get("/{assistant_id}", response_model=AssistantResponse, operation_id="get_assistant")
+async def get_assistant(
+    assistant_id: str = Path(..., description="The ID of the assistant to retrieve"),
+    solomon_consumer_key: str = Header(..., description="Solomon Consumer Key for authentication")
+):
+    try:
+        # Retrieve the OpenAI API key using the solomon_consumer_key
+        openai_api_key = await DBService.get_openai_api_key(solomon_consumer_key)
+        
+        if not openai_api_key:
+            raise HTTPException(status_code=401, detail="Invalid Solomon Consumer Key")
+
+        response = get_openai_assistant(assistant_id, openai_api_key=openai_api_key)
+        return AssistantResponse(**response)
+    except Exception as e:
+        logging.error(f"Error in get_assistant endpoint: {e}")
         raise HTTPException(status_code=500, detail="Internal Server Error")
