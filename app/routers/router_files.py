@@ -1,6 +1,6 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException, Form, Query, Header
-from models.models_files import UploadFileResponse, ListFilesResponse, FileContentUploadRequest, FileContentUploadResponse
-from services.service_files import upload_file, list_files, upload_file_content
+from models.models_files import UploadFileResponse, ListFilesResponse, FileContentUploadRequest, FileContentUploadResponse, FileResponse
+from services.service_files import upload_file, list_files, upload_file_content, get_file
 import logging
 import os
 import tempfile
@@ -24,8 +24,6 @@ async def upload_file_endpoint(
         
         if not openai_api_key:
             raise HTTPException(status_code=401, detail="Invalid Solomon Consumer Key")
-
-        logger.info(f"Retrieved OpenAI API key: {openai_api_key[:4]}...{openai_api_key[-4:]}")  # Log partial key
 
         # Save the uploaded file temporarily
         file_location = f"/tmp/{file.filename}"
@@ -56,8 +54,6 @@ async def list_files_endpoint(
         
         if not openai_api_key:
             raise HTTPException(status_code=401, detail="Invalid Solomon Consumer Key")
-
-        logger.info(f"Retrieved OpenAI API key: {openai_api_key[:4]}...{openai_api_key[-4:]}")  # Log partial key
 
         response = list_files(purpose=purpose, openai_api_key=openai_api_key)
         return response
@@ -94,4 +90,24 @@ async def upload_file_content_endpoint(
         
     except Exception as e:
         logger.exception(f"Error in upload_file_content_endpoint: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
+
+@router_files.get("/{file_id}", response_model=FileResponse, operation_id="get_file")
+async def get_file_endpoint(
+    file_id: str,
+    solomon_consumer_key: str = Header(..., description="Solomon Consumer Key for authentication")
+):
+    try:
+        # Retrieve the OpenAI API key using the solomon_consumer_key
+        openai_api_key = await DBService.get_openai_api_key(solomon_consumer_key)
+        
+        if not openai_api_key:
+            raise HTTPException(status_code=401, detail="Invalid Solomon Consumer Key")
+        
+        response = get_file(file_id=file_id, openai_api_key=openai_api_key)
+        return response
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        logger.exception(f"Error in get_file_endpoint: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
