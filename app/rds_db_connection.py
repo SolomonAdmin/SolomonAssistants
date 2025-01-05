@@ -188,7 +188,66 @@ class DatabaseConnector:
                 logging.error(f"Error deleting assistant builder thread: {e}")
                 session.rollback()
                 return False
-                
+    
+    def get_assistant_id_by_thread(self, thread_id: str, solomon_consumer_key: str) -> Optional[str]:
+        """
+        Retrieves the assistant_id associated with a thread_id and validates the solomon_consumer_key.
+        
+        Args:
+            thread_id (str): The ID of the thread
+            solomon_consumer_key (str): The Solomon consumer key for authentication
+            
+        Returns:
+            Optional[str]: The assistant_id if found, None otherwise
+        """
+        query = text("""
+            SELECT assistant_id 
+            FROM dbo.solConnect_AssistantBuilderThreads 
+            WHERE thread_id = :thread_id 
+            AND solomon_consumer_key = :solomon_consumer_key
+        """)
+        
+        with self.Session() as session:
+            try:
+                result = session.execute(query, {
+                    "thread_id": thread_id,
+                    "solomon_consumer_key": solomon_consumer_key
+                })
+                row = result.fetchone()
+                return row[0] if row else None
+            except SQLAlchemyError as e:
+                logging.error(f"Error retrieving assistant ID: {e}")
+                return None
+
+    def get_assistant_builder_id(self, solomon_consumer_key: str, workspace_name: str) -> Optional[str]:
+        """
+        Retrieves the assistant_builder_id for a given solomon_consumer_key and workspace_name.
+        
+        Args:
+            solomon_consumer_key (str): The Solomon consumer key
+            workspace_name (str): The workspace name
+            
+        Returns:
+            Optional[str]: The assistant_builder_id if found, None otherwise
+        """
+        query = text("""
+            SELECT assistant_builder_id 
+            FROM dbo.solConnectConsumers 
+            WHERE solomon_consumer_key = :solomon_consumer_key 
+            AND workspace_name = :workspace_name
+        """)
+        
+        with self.Session() as session:
+            try:
+                result = session.execute(query, {
+                    "solomon_consumer_key": solomon_consumer_key,
+                    "workspace_name": workspace_name
+                })
+                row = result.fetchone()
+                return row[0] if row else None
+            except SQLAlchemyError as e:
+                logging.error(f"Error retrieving assistant builder ID: {e}")
+                return None
 
 def test_db_connection():
     db = DatabaseConnector()
