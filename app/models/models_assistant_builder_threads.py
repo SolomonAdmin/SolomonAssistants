@@ -12,3 +12,12 @@ class AssistantBuilderThreadCreate(BaseModel):
 
 class AssistantBuilderThreadsResponse(BaseModel):
     threads: list[AssistantBuilderThread]
+
+class AssistantBuilderThreadsResponse(BaseModel):
+    threads: list[AssistantBuilderThread]
+    
+class AssistantIdResponse(BaseModel):
+    assistant_id: str
+
+class AssistantBuilderIdResponse(BaseModel):
+    assistant_builder_id: str
