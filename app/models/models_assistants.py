@@ -5,14 +5,6 @@ from datetime import datetime
 class Tool(BaseModel):
     type: str = Field(..., description="The type of the tool")
 
-class ToolResource(BaseModel):
-    file_ids: Optional[List[str]] = Field(None, description="File IDs for code interpreter")
-    vector_store_ids: Optional[List[str]] = Field(None, description="Vector store IDs for file search")
-
-class ToolResources(BaseModel):
-    code_interpreter: Optional[ToolResource] = Field(None, description="Resources for code interpreter")
-    file_search: Optional[ToolResource] = Field(None, description="Resources for file search")
-
 # Create assistants models
 class CreateAssistantRequest(BaseModel):
     model: str
@@ -69,18 +61,28 @@ class ListAssistantsResponse(BaseModel):
     has_more: bool
 
 # Modify assistant models
-class ModifyAssistantRequest(BaseModel):
-    model: Optional[str] = Field(None, description="ID of the model to use")
-    name: Optional[str] = Field(None, description="The name of the assistant")
-    description: Optional[str] = Field(None, description="The description of the assistant")
-    instructions: Optional[str] = Field(None, description="The system instructions that the assistant uses")
-    tools: Optional[List[Dict[str, str]]] = Field(None, description="List of tools to enable")
-    tool_resources: Optional[ToolResources] = Field(None, description="Resources for enabled tools")
-    metadata: Optional[Dict[str, Union[str, int]]] = None
+class FileSearchResource(BaseModel):
+    vector_store_ids: List[str]
+
+class CodeInterpreterResource(BaseModel):
     file_ids: Optional[List[str]] = None
-    temperature: Optional[float] = None
-    top_p: Optional[float] = None
-    response_format: Optional[Union[str, Dict[str, str]]] = None
+
+class ToolResources(BaseModel):
+    file_search: Optional[FileSearchResource] = None
+    code_interpreter: Optional[CodeInterpreterResource] = None
+
+class ModifyAssistantRequest(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    instructions: Optional[str] = None
+    tools: Optional[List[Tool]] = None
+    tool_resources: Optional[ToolResources] = None
+    model: Optional[str] = None
+    file_ids: Optional[List[str]] = None
+    metadata: Optional[Dict[str, Any]] = None
+    temperature: Optional[float] = Field(None, ge=0, le=2)
+    top_p: Optional[float] = Field(None, ge=0, le=1)
+    response_format: Optional[Dict[str, str]] = None
     
 class AssistantResponse(BaseModel):
     id: str = Field(..., description="The ID of the assistant")
