@@ -76,39 +76,16 @@ def list_openai_assistants(limit: int = 20, order: str = "desc", openai_api_key:
 
 def modify_openai_assistant(assistant_id: str, data: Dict[str, Any], openai_api_key: str):
     url = f"https://api.openai.com/v1/assistants/{assistant_id}"
-    headers = get_headers(openai_api_key)
+    headers = {
+        **get_headers(openai_api_key),
+        'OpenAI-Beta': 'assistants=v2'
+    }
     
-    # Convert the incoming data to a format OpenAI expects
-    payload = {}
-    
-    # Copy basic fields
-    for field in ['name', 'description', 'instructions', 'model', 'metadata', 
-                 'file_ids', 'temperature', 'top_p', 'response_format']:
-        if field in data and data[field] is not None:
-            payload[field] = data[field]
-    
-    # Handle tools and tool_resources
-    if 'tools' in data and data['tools'] is not None:
-        payload['tools'] = data['tools']
-        
-    if 'tool_resources' in data and data['tool_resources'] is not None:
-        tool_resources = {}
-        
-        # Access dictionary keys directly
-        if 'code_interpreter' in data['tool_resources']:
-            tool_resources['code_interpreter'] = {
-                'file_ids': data['tool_resources']['code_interpreter']['file_ids']
-            }
-            
-        if 'file_search' in data['tool_resources']:
-            tool_resources['file_search'] = {
-                'vector_store_ids': data['tool_resources']['file_search']['vector_store_ids']
-            }
-            
-        if tool_resources:
-            payload['tool_resources'] = tool_resources
+    # Remove None values from the data
+    payload = {k: v for k, v in data.items() if v is not None}
     
     try:
+        # Change PATCH to POST
         response = requests.post(url, headers=headers, json=payload)
         response.raise_for_status()
         return response.json()
