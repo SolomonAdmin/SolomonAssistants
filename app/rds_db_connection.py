@@ -248,6 +248,102 @@ class DatabaseConnector:
             except SQLAlchemyError as e:
                 logging.error(f"Error retrieving assistant builder ID: {e}")
                 return None
+    
+    def add_team_member(self, solomon_consumer_key: str, origin_assistant_id: str, 
+                     callable_assistant_id: str, callable_assistant_reason: Optional[str] = None) -> tuple[bool, str]:
+        """
+        Adds a new team member entry in the solConnectTeams table.
+        Returns a tuple of (success: bool, message: str)
+        """
+        # First check if the team member already exists
+        check_query = text("""
+            SELECT COUNT(1) 
+            FROM dbo.solConnectTeams 
+            WHERE solomon_consumer_key = :solomon_consumer_key
+            AND origin_assistant_id = :origin_assistant_id
+            AND callable_assistant_id = :callable_assistant_id
+        """)
+        
+        with self.Session() as session:
+            try:
+                # Check for existing record
+                result = session.execute(check_query, {
+                    "solomon_consumer_key": solomon_consumer_key,
+                    "origin_assistant_id": origin_assistant_id,
+                    "callable_assistant_id": callable_assistant_id
+                })
+                
+                if result.scalar() > 0:
+                    return False, "Team member already exists"
+
+                # If no existing record, proceed with insert
+                insert_query = text("""
+                    INSERT INTO dbo.solConnectTeams 
+                    (solomon_consumer_key, origin_assistant_id, callable_assistant_id, callable_assistant_reason)
+                    VALUES (:solomon_consumer_key, :origin_assistant_id, :callable_assistant_id, :callable_assistant_reason)
+                """)
+                
+                session.execute(insert_query, {
+                    "solomon_consumer_key": solomon_consumer_key,
+                    "origin_assistant_id": origin_assistant_id,
+                    "callable_assistant_id": callable_assistant_id,
+                    "callable_assistant_reason": callable_assistant_reason
+                })
+                session.commit()
+                return True, "Team member added successfully"
+                
+            except SQLAlchemyError as e:
+                logging.error(f"Error adding team member: {e}")
+                session.rollback()
+                return False, f"Database error: {str(e)}"
+
+    def get_team_callable_assistants(self, solomon_consumer_key: str, origin_assistant_id: str) -> List[Dict[str, Any]]:
+        """
+        Retrieves all callable assistants for a given origin assistant.
+        """
+        query = text("""
+            SELECT callable_assistant_id, callable_assistant_reason
+            FROM dbo.solConnectTeams
+            WHERE solomon_consumer_key = :solomon_consumer_key 
+            AND origin_assistant_id = :origin_assistant_id
+        """)
+        
+        with self.Session() as session:
+            try:
+                result = session.execute(query, {
+                    "solomon_consumer_key": solomon_consumer_key,
+                    "origin_assistant_id": origin_assistant_id
+                })
+                return [row._asdict() for row in result.fetchall()]
+            except SQLAlchemyError as e:
+                logging.error(f"Error retrieving team callable assistants: {e}")
+                return []
+
+    def delete_team_callable_assistant(self, solomon_consumer_key: str, origin_assistant_id: str, 
+                                    callable_assistant_id: str) -> bool:
+        """
+        Deletes a specific team callable assistant entry.
+        """
+        query = text("""
+            DELETE FROM dbo.solConnectTeams
+            WHERE solomon_consumer_key = :solomon_consumer_key
+            AND origin_assistant_id = :origin_assistant_id
+            AND callable_assistant_id = :callable_assistant_id
+        """)
+        
+        with self.Session() as session:
+            try:
+                result = session.execute(query, {
+                    "solomon_consumer_key": solomon_consumer_key,
+                    "origin_assistant_id": origin_assistant_id,
+                    "callable_assistant_id": callable_assistant_id
+                })
+                session.commit()
+                return result.rowcount > 0
+            except SQLAlchemyError as e:
+                logging.error(f"Error deleting team callable assistant: {e}")
+                session.rollback()
+                return False
 
 def test_db_connection():
     db = DatabaseConnector()

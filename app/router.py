@@ -12,6 +12,7 @@ from routers.router_auth import router_auth
 from routers.router_tools import tool_available_router 
 from routers.router_assistant_builder_threads import router_assistant_builder_threads
 from routers.router_workato import router_workato
+from routers.router_teams import router_teams
 
 router = SafeAPIRouter(prefix="/api/v2")
 
@@ -27,3 +28,4 @@ router.include_router(router_threads)
 router.include_router(router_auth)
 router.include_router(router_assistant_builder_threads)
 router.include_router(router_workato)
+router.include_router(router_teams)
