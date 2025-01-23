@@ -6,6 +6,7 @@ from .assistants.create_assistant_tool import CreateAssistantTool
 from .assistants.list_assistants_tool import ListAssistantsTool
 from .assistants.modify_assistant_tool import ModifyAssistantTool
 from .assistants.delete_assistant_tool import DeleteAssistantTool
+from .assistants.call_agent_tool import CallAgentTool
 
 tool_registry: Dict[str, Type[BaseTool]] = {
     "get_current_temperature": CurrentTemperatureTool,
@@ -14,4 +15,5 @@ tool_registry: Dict[str, Type[BaseTool]] = {
     "list_assistants": ListAssistantsTool,
     "modify_assistant": ModifyAssistantTool,
     "delete_assistant": DeleteAssistantTool,
+    "call_agent": CallAgentTool
 }
