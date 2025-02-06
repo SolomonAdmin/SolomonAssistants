@@ -7,7 +7,7 @@ from .assistants.list_assistants_tool import ListAssistantsTool
 from .assistants.modify_assistant_tool import ModifyAssistantTool
 from .assistants.delete_assistant_tool import DeleteAssistantTool
 from .assistants.call_agent_tool import CallAgentTool
-from .workato_action_tool import WorkatoActionTool
+from .workato_action_tool.workato_action_tool import WorkatoActionTool
 
 tool_registry: Dict[str, Type[BaseTool]] = {
     "get_current_temperature": CurrentTemperatureTool,
