@@ -1,15 +1,15 @@
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 import requests
 import json
 
 class WorkatoActionTool:
-    def execute(self, action_type: str, parameters: Dict[str, Any], schema: str) -> str:
+    def execute(self, action_type: str, schema: str, parameters: Optional[Dict[str, Any]] = None) -> str:
         """
         Sends a POST request to the Workato action endpoint with specified action type, parameters, and schema.
 
         :param action_type: The specific task to execute (e.g., 'query_db', 'send_email', etc.).
-        :param parameters: A dictionary containing necessary parameters for the requested action.
         :param schema: The schema to be used for the action.
+        :param parameters: Optional dictionary containing necessary parameters for the requested action.
         :return: The response text as a string.
         """
         url = 'https://apim.workato.com/solconsult/assistant-tools-v1/workato-root-tool'
@@ -19,7 +19,7 @@ class WorkatoActionTool:
         }
         data = {
             'action_type': action_type,
-            'parameters': parameters,
+            'parameters': parameters or {},
             'schema': schema
         }
         response = requests.post(url, json=data, headers=headers)
@@ -47,7 +47,7 @@ class WorkatoActionTool:
                             "description": "The schema to be used for the action."
                         }
                     },
-                    "required": ["action_type", "parameters", "schema"]
+                    "required": ["action_type", "schema"]  # Removed parameters from required list
                 }
             }
         }

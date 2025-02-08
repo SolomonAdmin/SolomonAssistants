@@ -17,5 +17,5 @@ tool_registry: Dict[str, Type[BaseTool]] = {
     "modify_assistant": ModifyAssistantTool,
     "delete_assistant": DeleteAssistantTool,
     "call_agent": CallAgentTool,
-    "workato_action_tool": WorkatoActionTool,
+    "execute_workato_action": WorkatoActionTool,
 }
