@@ -14,7 +14,7 @@ class WorkatoActionTool:
         """
         url = 'https://apim.workato.com/solconsult/assistant-tools-v1/workato-root-tool'
         headers = {
-            'API-TOKEN': 'Odea97039e93b574b8e94036c2b747f43462ae3aec05ca781a746152fa7107f8',
+            'API-TOKEN': '0c95440824af817055b784c1e87bd31e36f21066df49f4d863e574cbf6e3b4d6',
             'Content-Type': 'application/json'
         }
         data = {
