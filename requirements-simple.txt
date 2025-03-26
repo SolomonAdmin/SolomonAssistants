@@ -1,0 +1,25 @@
+# Core packages with specific versions
+fastapi>=0.103.0
+uvicorn[standard]>=0.23.0
+openai==1.73.0
+python-dotenv==1.0.1
+langchain==0.2.5
+websockets>=11.0.0
+
+# Database drivers
+psycopg2-binary==2.9.10
+pymysql==1.1.1
+pyodbc==5.2.0
+sqlalchemy==2.0.30
+
+# JWT & Authentication
+python-jose[cryptography]
+passlib[bcrypt]
+pyjwt==2.10.1
+
+# Utilities
+aiohttp==3.9.5
+python-multipart
+
+# Set pydantic to a compatible version with all dependencies
+pydantic>=2.10.0,<3.0.0 

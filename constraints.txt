@@ -1,0 +1,6 @@
+# Core dependencies with compatible versions
+pydantic>=2.10.0,<3.0.0
+langchain<0.3.0
+pydantic-settings>=2.0.0
+langchain-core<0.3.0
+langsmith<0.2.0 

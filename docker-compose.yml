@@ -2,17 +2,22 @@ version: '3.8'
 
 services:
   web:
+    platform: linux/amd64
     build: .
     ports:
-      - "80:80"
-    env_file:
-      - .env
+      - "8080:80"
+    # Comment out the env_file line temporarily
+    # env_file:
+    #   - .env
     volumes:
       - ./app:/app/app
       - ./helpers:/app/helpers
       - ./config.py:/app/config.py
-    command: uvicorn app.main:app --host 0.0.0.0 --port 80 --reload
+      - ./.env:/app/.env
+    # command: uvicorn app.main:app --host 0.0.0.0 --port 80 --reload
+    command: bash -c "python -m uvicorn app.main:app --host 0.0.0.0 --port 80 --reload --env-file /app/.env"
 
-volumes:
-  app:
-  helpers:
+    # Alternatively, specify environment variables directly
+    environment:
+      - PYTHONPATH=/app:/app/app
+      # Add other required variables here
