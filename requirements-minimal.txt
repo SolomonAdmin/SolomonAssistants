@@ -1,0 +1,19 @@
+# Core dependencies only - let pip resolve versions
+fastapi
+uvicorn[standard]
+openai>=1.6.0
+pydantic>=2.0.0
+python-dotenv
+langchain
+websockets
+psycopg2-binary
+python-jose[cryptography]
+passlib[bcrypt]
+aiohttp 
+python-multipart
+python-dotenv
+openai-agents
+aiohttp
+boto3
+jwt
+pyodbc
