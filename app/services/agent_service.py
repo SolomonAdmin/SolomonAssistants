@@ -168,7 +168,7 @@ class AgentService:
         context: Optional[Dict[str, Any]] = None
     ) -> AsyncGenerator[StreamEvent, None]:
         """
-        Run the agent with the given input text and simulate streaming responses.
+        Run the agent with the given input text and stream responses.
         
         Args:
             input_text: The text to process
@@ -182,68 +182,88 @@ class AgentService:
         
         try:
             # First yield a starting event
-            yield StreamEvent(type="start", data={"message": "Starting agent processing"})
+            yield StreamEvent(type="system", data={"message": "Starting agent processing"})
             
-            # Run the agent - get the complete response without streaming
-            # (We'll simulate streaming since the SDK might not support actual streaming)
+            # Run the agent
             result = await Runner.run(
                 starting_agent=self.agent,
                 input=input_text,
                 context=context or {}
             )
             
-            # Extract the output from the result
-            output = ""
-            if result.new_items:
-                for item in reversed(result.new_items):
-                    # Find a MessageOutputItem to get the final response
+            # Process the result and stream it
+            if hasattr(result, 'new_items') and result.new_items:
+                for item in result.new_items:
+                    # Handle message content
                     if hasattr(item, 'message') and hasattr(item.message, 'content'):
-                        output = item.message.content
-                        break
-                    # Check if raw_item exists and extract content
-                    elif hasattr(item, 'raw_item'):
-                        if hasattr(item.raw_item, 'content') and isinstance(item.raw_item.content, list):
-                            # Combine all text from content items
-                            content_texts = []
-                            for content_item in item.raw_item.content:
-                                if hasattr(content_item, 'text'):
-                                    content_texts.append(content_item.text)
-                            
-                            if content_texts:
-                                output = "\n".join(content_texts)
-                                break
-                    # Direct access to text attribute as a fallback
+                        content = item.message.content
+                        # Break content into sentences and stream each one
+                        sentences = content.split('. ')
+                        for i, sentence in enumerate(sentences):
+                            if i < len(sentences) - 1:
+                                sentence += '.'
+                            yield StreamEvent(type="stream", data={"content": sentence + ' '})
+                            await asyncio.sleep(0.05)  # Small delay between sentences
+                    # Handle tool usage
+                    elif hasattr(item, 'tool'):
+                        yield StreamEvent(type="tool", data={
+                            "tool": item.tool,
+                            "name": item.name,
+                            "content": item.content
+                        })
+                    # Handle system messages
+                    elif hasattr(item, 'system'):
+                        yield StreamEvent(type="system", data={"message": item.system})
+                    # Handle raw content
+                    elif hasattr(item, 'content'):
+                        content = item.content
+                        # Break content into sentences and stream each one
+                        sentences = content.split('. ')
+                        for i, sentence in enumerate(sentences):
+                            if i < len(sentences) - 1:
+                                sentence += '.'
+                            yield StreamEvent(type="stream", data={"content": sentence + ' '})
+                            await asyncio.sleep(0.05)  # Small delay between sentences
+                    # Handle raw text
                     elif hasattr(item, 'text'):
-                        output = item.text
-                        break
+                        content = item.text
+                        # Break content into sentences and stream each one
+                        sentences = content.split('. ')
+                        for i, sentence in enumerate(sentences):
+                            if i < len(sentences) - 1:
+                                sentence += '.'
+                            yield StreamEvent(type="stream", data={"content": sentence + ' '})
+                            await asyncio.sleep(0.05)  # Small delay between sentences
+                    # Handle raw_item with content
+                    elif hasattr(item, 'raw_item'):
+                        if hasattr(item.raw_item, 'content'):
+                            if isinstance(item.raw_item.content, list):
+                                for content_item in item.raw_item.content:
+                                    if hasattr(content_item, 'text'):
+                                        content = content_item.text
+                                        # Break content into sentences and stream each one
+                                        sentences = content.split('. ')
+                                        for i, sentence in enumerate(sentences):
+                                            if i < len(sentences) - 1:
+                                                sentence += '.'
+                                            yield StreamEvent(type="stream", data={"content": sentence + ' '})
+                                            await asyncio.sleep(0.05)  # Small delay between sentences
+                            else:
+                                content = item.raw_item.content
+                                # Break content into sentences and stream each one
+                                sentences = content.split('. ')
+                                for i, sentence in enumerate(sentences):
+                                    if i < len(sentences) - 1:
+                                        sentence += '.'
+                                    yield StreamEvent(type="stream", data={"content": sentence + ' '})
+                                    await asyncio.sleep(0.05)  # Small delay between sentences
             
-            # If we have an output, simulate streaming by breaking it into chunks
-            if output:
-                # Track tool usage to simulate tool events
-                tool_mentioned = False
-                
-                # Break the output into sentences
-                sentences = output.split(". ")
-                
-                for i, sentence in enumerate(sentences):
-                    # Add the period back except for the last sentence
-                    if i < len(sentences) - 1:
-                        sentence += "."
-                    
-                    # If the sentence mentions tools and we haven't simulated a tool event yet
-                    if ("tool" in sentence.lower() or "search" in sentence.lower()) and not tool_mentioned:
-                        yield StreamEvent(type="tool_event", data={"message": "Using a tool"})
-                        tool_mentioned = True
-                    
-                    # Yield the sentence as a content chunk
-                    yield StreamEvent(type="content_chunk", data={"content": sentence + " "})
-                    
-                    # Add a small delay to simulate real streaming
-                    await asyncio.sleep(0.05)
-            
-            # Yield a completion event
-            yield StreamEvent(type="completion", data={"message": "Processing complete"})
+            # Log the result structure for debugging
+            logger.info(f"Result structure: {dir(result)}")
+            if hasattr(result, 'new_items'):
+                logger.info(f"New items: {[dir(item) for item in result.new_items]}")
             
         except Exception as e:
-            logger.error(f"Error in streaming agent run: {str(e)}")
+            logger.error(f"Error in streaming agent: {str(e)}")
+            yield StreamEvent(type="error", data={"message": str(e)})
             raise 

@@ -2,15 +2,6 @@ from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Query, 
 from fastapi.params import Body
 from fastapi.responses import JSONResponse
 from models.models_assistants import CreateAssistantRequest, AssistantResponse, ListAssistantsRequest, ListAssistantsResponse, Assistant, ModifyAssistantRequest, DeleteAssistantResponse, CreateAssistantWithToolsRequest
-from models.models_assistants import (
-    CreateAssistantRequest, 
-    ListAssistantsRequest, 
-    ListAssistantsResponse, 
-    ModifyAssistantRequest, 
-    DeleteAssistantResponse,
-    CreateAssistantWithToolsRequest,
-    AssistantResponse,
-)
 from services.service_db import DBService
 from services.service_assistants import create_assistant_service, list_openai_assistants, modify_openai_assistant, delete_openai_assistant, create_assistant_with_tools, get_openai_assistant
 import logging
