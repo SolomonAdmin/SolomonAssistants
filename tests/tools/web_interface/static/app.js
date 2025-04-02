@@ -2,31 +2,34 @@ class AssistantBridgeUI {
     constructor() {
         this.ws = null;
         this.connected = false;
+        this.currentResponseTurn = null;
+        this.systemMessageCount = 0;
         this.setupEventListeners();
+        this.connect();
     }
 
     setupEventListeners() {
-        // Connect button
-        document.getElementById('connectBtn').addEventListener('click', () => this.connect());
-        
-        // Send button
-        document.getElementById('sendBtn').addEventListener('click', () => this.sendMessage());
-        
+        // Send button click
+        const sendBtn = document.getElementById('sendBtn');
+        sendBtn.addEventListener('click', () => this.sendMessage());
+
         // Enter key in message input
-        document.getElementById('messageInput').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
+        const messageInput = document.getElementById('messageInput');
+        messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
                 this.sendMessage();
             }
         });
     }
 
     connect() {
-        const apiKey = document.getElementById('apiKey').value;
-        const assistantId = document.getElementById('assistantId').value;
-        const vectorStoreId = document.getElementById('vectorStoreId').value;
+        const apiKey = sessionStorage.getItem('apiKey');
+        const assistantId = sessionStorage.getItem('assistantId');
+        const vectorStoreId = sessionStorage.getItem('vectorStoreId');
 
         if (!apiKey || !assistantId) {
-            this.addMessage('Error: API Key and Assistant ID are required', 'error');
+            this.addSystemMessage('Error: API Key and Assistant ID are required');
             return;
         }
 
@@ -37,7 +40,7 @@ class AssistantBridgeUI {
 
         this.ws.onopen = () => {
             this.connected = true;
-            this.addMessage('Connected to WebSocket server', 'system');
+            this.addSystemMessage('Connected to WebSocket server');
             
             // Initialize the assistant bridge
             this.ws.send(JSON.stringify({
@@ -54,92 +57,91 @@ class AssistantBridgeUI {
 
         this.ws.onclose = () => {
             this.connected = false;
-            this.addMessage('Disconnected from WebSocket server', 'system');
+            this.addSystemMessage('Disconnected from WebSocket server');
         };
 
         this.ws.onerror = (error) => {
-            this.addMessage(`WebSocket error: ${error.message}`, 'error');
+            this.addSystemMessage(`WebSocket error: ${error.message}`);
         };
     }
 
     handleWebSocketMessage(data) {
-        switch (data.type) {
-            case 'stream':
-                this.addMessage(data.content, 'assistant');
-                break;
-            case 'tool':
-                if (data.tool === 'call') {
-                    this.addMessage(`[Using tool: ${data.name}]`, 'tool');
-                } else if (data.tool === 'output') {
-                    this.addMessage(`[Tool output: ${data.content}]`, 'tool');
+        console.log('Received message:', data);
+        
+        if (data.type === 'message') {
+            if (data.role === 'system') {
+                this.addSystemMessage(data.content);
+            } else if (data.role === 'assistant') {
+                // If this is a new turn or we have the new_turn flag, create a new bubble
+                if (data.new_turn || !this.currentResponseTurn) {
+                    // Create a new turn for this response
+                    console.log("Creating new bubble for assistant message");
+                    this.currentResponseTurn = document.createElement('div');
+                    this.currentResponseTurn.className = 'mb-2 text-left bg-gray-100 text-gray-800 rounded-lg p-2 mr-auto max-w-[80%]';
+                    this.currentResponseTurn.textContent = '';
+                    document.getElementById('chatMessages').appendChild(this.currentResponseTurn);
                 }
-                break;
-            case 'error':
-                this.addMessage(`Error: ${data.error}`, 'error');
-                break;
-            case 'system':
-                if (data.message && !data.message.includes('Processing')) {
-                    this.addMessage(`System: ${data.message}`, 'system');
-                }
-                break;
-            case 'response':
-                this.addMessage(data.content, 'assistant');
-                break;
-            default:
-                this.addMessage(`Received unknown message type: ${data.type}`, 'system');
+                
+                // Append this chunk to the current turn
+                this.currentResponseTurn.textContent += data.content;
+                this.scrollToBottom();
+            }
+        } else if (data.type === 'error') {
+            this.addSystemMessage(`Error: ${data.error}`);
         }
     }
 
+    addSystemMessage(message) {
+        console.log('System:', message);
+        
+        // Update the system message count badge
+        this.systemMessageCount++;
+        document.getElementById('systemMessageCount').textContent = this.systemMessageCount;
+        
+        // Add the message to the tooltip list
+        const systemMessageList = document.getElementById('systemMessageList');
+        const messageItem = document.createElement('div');
+        messageItem.className = 'text-sm text-gray-600 mb-1';
+        messageItem.textContent = message;
+        systemMessageList.appendChild(messageItem);
+        
+        // No longer add system messages to the main chat
+    }
+
     sendMessage() {
-        if (!this.connected) {
-            this.addMessage('Not connected to WebSocket server', 'error');
-            return;
-        }
+        if (!this.connected) return;
 
         const messageInput = document.getElementById('messageInput');
         const message = messageInput.value.trim();
+        if (!message) return;
 
-        if (!message) {
-            return;
-        }
+        // Create user message bubble
+        const userBubble = document.createElement('div');
+        userBubble.className = 'mb-2 text-right bg-blue-500 text-white rounded-lg p-2 ml-auto max-w-[80%]';
+        userBubble.textContent = message;
+        document.getElementById('chatMessages').appendChild(userBubble);
 
-        this.addMessage(message, 'user');
-        messageInput.value = '';
+        // We don't reset currentResponseTurn here anymore - 
+        // we'll let the server tell us when to create a new bubble
 
+        // Send to server
         this.ws.send(JSON.stringify({
             type: 'chat_message',
             message: message
         }));
+
+        // Clear input
+        messageInput.value = '';
+        this.scrollToBottom();
     }
 
-    addMessage(message, type) {
+    scrollToBottom() {
         const chatMessages = document.getElementById('chatMessages');
-        const messageDiv = document.createElement('div');
-        messageDiv.className = `mb-2 ${this.getMessageClass(type)}`;
-        messageDiv.textContent = message;
-        chatMessages.appendChild(messageDiv);
         chatMessages.scrollTop = chatMessages.scrollHeight;
-    }
-
-    getMessageClass(type) {
-        switch (type) {
-            case 'user':
-                return 'text-blue-600 font-medium';
-            case 'assistant':
-                return 'text-green-600';
-            case 'system':
-                return 'text-gray-500 italic';
-            case 'error':
-                return 'text-red-600';
-            case 'tool':
-                return 'text-purple-600';
-            default:
-                return 'text-gray-700';
-        }
     }
 }
 
-// Initialize the UI when the page loads
+// Initialize when the page loads
 document.addEventListener('DOMContentLoaded', () => {
     new AssistantBridgeUI();
 }); 

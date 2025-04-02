@@ -19,22 +19,25 @@ class ConnectionManager {
     }
 
     connect() {
-        const apiKey = document.getElementById('apiKey').value;
-        const assistantId = document.getElementById('assistantId').value;
-        const vectorStoreId = document.getElementById('vectorStoreId').value;
-
+        const apiKey = document.getElementById('apiKey').value.trim();
+        const assistantId = document.getElementById('assistantId').value.trim();
+        const vectorStoreId = document.getElementById('vectorStoreId').value.trim();
+        
         if (!apiKey || !assistantId) {
-            this.showError('API Key and Assistant ID are required');
+            alert('API Key and Assistant ID are required');
             return;
         }
-
-        // Store connection details in sessionStorage
-        sessionStorage.setItem('apiKey', apiKey);
-        sessionStorage.setItem('assistantId', assistantId);
-        sessionStorage.setItem('vectorStoreId', vectorStoreId);
-
-        // Redirect to chat page
-        window.location.href = '/static/chat.html';
+        
+        // Encode parameters properly
+        const params = new URLSearchParams();
+        params.set('apiKey', encodeURIComponent(apiKey));
+        params.set('assistantId', encodeURIComponent(assistantId));
+        if (vectorStoreId) {
+            params.set('vectorStoreId', encodeURIComponent(vectorStoreId));
+        }
+        
+        // Redirect to chat interface
+        window.location.href = `/static/chat.html?${params.toString()}`;
     }
 
     showError(message) {

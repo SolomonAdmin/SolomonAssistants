@@ -2,6 +2,12 @@
 Test server for the web interface to test the OpenAI Assistant Bridge.
 This is separate from the main application to keep the backend clean.
 """
+import sys
+import os
+
+# Ensure project root (SolomonAssistants/) is in the Python path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../")))
+
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -9,6 +15,7 @@ from pathlib import Path
 import logging
 import json
 from typing import List, Dict, Any
+from app.services.agent_service import AgentService
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -24,139 +31,158 @@ test_app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 # WebSocket connection manager
 class ConnectionManager:
     def __init__(self):
-        self.active_connections: List[WebSocket] = []
-        self.agent_services = {}  # Store agent services by connection
-        
-    async def connect(self, websocket: WebSocket):
-        await websocket.accept()
-        self.active_connections.append(websocket)
-        logger.info(f"New WebSocket connection. Total connections: {len(self.active_connections)}")
-        
+        self.active_connections: Dict[WebSocket, AgentService] = {}
+    
+    async def connect(self, websocket: WebSocket, agent_service: AgentService):
+        """Store the connection and agent service."""
+        self.active_connections[websocket] = agent_service
+    
     def disconnect(self, websocket: WebSocket):
+        """Remove a connection."""
         if websocket in self.active_connections:
-            self.active_connections.remove(websocket)
-            if websocket in self.agent_services:
-                del self.agent_services[websocket]
-            logger.info(f"WebSocket disconnected. Remaining connections: {len(self.active_connections)}")
-        
-    async def send_json(self, data: Dict[str, Any], websocket: WebSocket):
-        await websocket.send_json(data)
+            del self.active_connections[websocket]
+    
+    def get_agent_service(self, websocket: WebSocket) -> AgentService:
+        """Get the agent service for a connection."""
+        return self.active_connections.get(websocket)
 
 # Initialize the connection manager
 manager = ConnectionManager()
 
 @test_app.get("/")
 async def read_root():
-    """Serve the test interface HTML page"""
+    """Serve the connection page"""
     return FileResponse(str(static_dir / "index.html"))
+
+@test_app.get("/static/{path:path}")
+async def read_static(path: str):
+    """Serve static files"""
+    return FileResponse(str(static_dir / path))
+
+@test_app.get("/chat")
+async def read_chat():
+    """Serve the chat interface page"""
+    return FileResponse(str(static_dir / "chat.html"))
 
 @test_app.websocket("/ws/assistant/{assistant_id}")
 async def websocket_endpoint(websocket: WebSocket, assistant_id: str):
-    await manager.connect(websocket)
     try:
-        await manager.send_json({
-            "type": "connection_established",
-            "data": {
-                "assistant_id": assistant_id,
-                "message": "Connected to the test interface"
-            }
-        }, websocket)
-        
+        await websocket.accept()
+        logger.info("connection open")
+
+        # Initialize agent service
+        agent_service = None
+
         while True:
-            data = await websocket.receive_json()
+            message = await websocket.receive_text()
+            data = json.loads(message)
             
-            if data.get("type") == "initialize":
-                # Initialize agent service
-                from app.services.agent_service import AgentService
-                
-                api_key = data.get("api_key")
+            if data["type"] == "initialize":
+                logger.info(f"Received init message: {data}")
+                api_key = data["api_key"]
                 vector_store_ids = data.get("vector_store_ids", [])
                 
-                if not api_key:
-                    await manager.send_json({
-                        "type": "error",
-                        "data": {"message": "API key is required for initialization"}
-                    }, websocket)
-                    continue
-                
                 try:
-                    # Initialize agent service
                     agent_service = AgentService(api_key=api_key)
-                    await agent_service.initialize(
-                        assistant_id=assistant_id,
-                        vector_store_ids=vector_store_ids
-                    )
+                    await agent_service.initialize(assistant_id)
+                    logger.info("Agent service initialized")
                     
-                    # Store the agent service for this connection
-                    manager.agent_services[websocket] = agent_service
-                    
-                    await manager.send_json({
-                        "type": "initialized",
-                        "data": {"message": "Agent service initialized successfully"}
-                    }, websocket)
+                    await websocket.send_json({
+                        "type": "initialized"
+                    })
+                    logger.info("Sent initialization success message")
                     
                 except Exception as e:
-                    await manager.send_json({
+                    error_msg = f"Failed to initialize agent: {str(e)}"
+                    logger.error(error_msg)
+                    await websocket.send_json({
                         "type": "error",
-                        "data": {"message": f"Initialization error: {str(e)}"}
-                    }, websocket)
+                        "error": error_msg
+                    })
+                    continue
             
-            elif data.get("type") == "chat_message":
-                # Process chat message using the agent service
-                message = data.get("message", "")
-                if not message:
-                    await manager.send_json({
+            elif data["type"] == "chat_message":
+                if not agent_service:
+                    await websocket.send_json({
                         "type": "error",
-                        "data": {"message": "Message content is required"}
-                    }, websocket)
+                        "error": "Agent not initialized"
+                    })
                     continue
                 
                 try:
-                    agent_service = manager.agent_services.get(websocket)
-                    if not agent_service:
-                        await manager.send_json({
-                            "type": "error",
-                            "data": {"message": "Agent service not initialized"}
-                        }, websocket)
-                        continue
+                    # Process message with streaming
+                    logger.info("Starting streaming response")
                     
-                    async for event in agent_service.run_existing_agent_streaming(message):
-                        if event.type == "stream":
-                            await manager.send_json({
-                                "type": "stream",
-                                "content": event.data.get("content", "")
-                            }, websocket)
-                        elif event.type == "tool":
-                            await manager.send_json({
-                                "type": "tool",
-                                "tool": event.data.get("tool"),
-                                "name": event.data.get("name"),
-                                "content": event.data.get("content")
-                            }, websocket)
-                        elif event.type == "system":
-                            await manager.send_json({
-                                "type": "system",
-                                "message": event.data.get("message")
-                            }, websocket)
+                    # Send initial system message
+                    await websocket.send_json({
+                        "type": "message",
+                        "role": "system",
+                        "content": "Starting agent processing"
+                    })
+                    
+                    # Process the user message and stream the response
+                    # Note: We don't echo back the user message since the client creates it
+                    first_chunk = True  # Flag to mark the first chunk of this response
+                    
+                    async for event in agent_service.run_existing_agent_streaming(
+                        input_text=data["message"],
+                        context={}
+                    ):
+                        logger.info(f"Received event: {event}")
                         
-                except Exception as e:
-                    await manager.send_json({
-                        "type": "error",
-                        "data": {"message": f"Error processing message: {str(e)}"}
-                    }, websocket)
+                        if event.type == "content_chunk":
+                            content = event.data.get("content", "")
+                            if content.strip():  # Only send non-empty chunks
+                                message_data = {
+                                    "type": "message",
+                                    "role": "assistant",
+                                    "content": content
+                                }
+                                
+                                # For the first chunk, add a flag to indicate a new turn
+                                if first_chunk:
+                                    message_data["new_turn"] = True
+                                    first_chunk = False
+                                    
+                                await websocket.send_json(message_data)
+                            
+                        elif event.type == "tool_event":
+                            # Send tool usage as system message
+                            await websocket.send_json({
+                                "type": "message",
+                                "role": "system",
+                                "content": f"Using tool: {event.data.get('name', 'unknown')}"
+                            })
+                            
+                        elif event.type == "system":
+                            # Send system message
+                            await websocket.send_json({
+                                "type": "message",
+                                "role": "system",
+                                "content": event.data.get("message", "")
+                            })
                     
+                    logger.info("Finished streaming response")
+                            
+                except Exception as e:
+                    logger.error(f"Error processing message: {str(e)}")
+                    await websocket.send_json({
+                        "type": "message",
+                        "role": "system",
+                        "content": f"Error: {str(e)}"
+                    })
+            
     except WebSocketDisconnect:
-        manager.disconnect(websocket)
+        logger.info("WebSocket disconnected")
     except Exception as e:
         logger.error(f"WebSocket error: {str(e)}")
         try:
-            await manager.send_json({
+            await websocket.send_json({
                 "type": "error",
-                "data": {"message": f"Unexpected error: {str(e)}"}
-            }, websocket)
+                "error": str(e)
+            })
         except:
             pass
-        manager.disconnect(websocket)
 
 if __name__ == "__main__":
     import uvicorn

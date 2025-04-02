@@ -1,0 +1,3 @@
+"""
+Solomon Assistants package.
+"""
