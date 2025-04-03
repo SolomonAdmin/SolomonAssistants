@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Assistant Bridge Test Interface</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <style>
+        /* Custom scrollbar for chat messages */
+        #chatMessages::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        #chatMessages::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+
+        #chatMessages::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 4px;
+        }
+
+        #chatMessages::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+
+        /* Message animations */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        #chatMessages > div {
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        /* Input focus styles */
+        input:focus {
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5);
+        }
+
+        /* Button hover effects */
+        button {
+            transition: all 0.2s ease-in-out;
+        }
+
+        button:hover {
+            transform: translateY(-1px);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div class="container mx-auto px-4 py-8">
+        <h1 class="text-3xl font-bold mb-8">Assistant Bridge Test Interface</h1>
+        
+        <!-- Connection Form -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h2 class="text-xl font-semibold mb-4">Connection Settings</h2>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Backend URL</label>
+                    <input type="text" id="backendUrl" value="ws://localhost:8080" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">OpenAI API Key</label>
+                    <input type="password" id="apiKey" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Assistant ID</label>
+                    <input type="text" id="assistantId" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Vector Store ID (Optional)</label>
+                    <input type="text" id="vectorStoreId" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                </div>
+                <button id="connectBtn" class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+                    Connect
+                </button>
+            </div>
+        </div>
+
+        <!-- Chat Interface -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <h2 class="text-xl font-semibold mb-4">Chat Interface</h2>
+            <div class="space-y-4">
+                <div id="chatMessages" class="h-96 overflow-y-auto border rounded-md p-4 mb-4"></div>
+                <div class="flex space-x-4">
+                    <input type="text" id="messageInput" class="flex-1 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" placeholder="Type your message...">
+                    <button id="sendBtn" class="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2">
+                        Send
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class AssistantBridgeUI {
+            constructor() {
+                this.ws = null;
+                this.connected = false;
+                this.setupEventListeners();
+            }
+
+            setupEventListeners() {
+                document.getElementById('connectBtn').addEventListener('click', () => this.connect());
+                document.getElementById('sendBtn').addEventListener('click', () => this.sendMessage());
+                document.getElementById('messageInput').addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') {
+                        this.sendMessage();
+                    }
+                });
+            }
+
+            connect() {
+                const backendUrl = document.getElementById('backendUrl').value;
+                const apiKey = document.getElementById('apiKey').value;
+                const assistantId = document.getElementById('assistantId').value;
+                const vectorStoreId = document.getElementById('vectorStoreId').value;
+
+                if (!apiKey || !assistantId) {
+                    this.addMessage('Error: API Key and Assistant ID are required', 'error');
+                    return;
+                }
+
+                // Create WebSocket connection
+                const wsUrl = `${backendUrl}/ws/assistant/${assistantId}`;
+                this.ws = new WebSocket(wsUrl);
+
+                this.ws.onopen = () => {
+                    this.connected = true;
+                    this.addMessage('Connected to WebSocket server', 'system');
+                    
+                    // Initialize the assistant bridge
+                    this.ws.send(JSON.stringify({
+                        type: 'initialize',
+                        api_key: apiKey,
+                        vector_store_ids: vectorStoreId ? [vectorStoreId] : []
+                    }));
+                };
+
+                this.ws.onmessage = (event) => {
+                    const data = JSON.parse(event.data);
+                    this.handleWebSocketMessage(data);
+                };
+
+                this.ws.onclose = () => {
+                    this.connected = false;
+                    this.addMessage('Disconnected from WebSocket server', 'system');
+                };
+
+                this.ws.onerror = (error) => {
+                    this.addMessage(`WebSocket error: ${error.message}`, 'error');
+                };
+            }
+
+            handleWebSocketMessage(data) {
+                switch (data.type) {
+                    case 'connection_established':
+                        this.addMessage('Connection established with assistant', 'system');
+                        break;
+                    case 'initialized':
+                        this.addMessage('Assistant bridge initialized successfully', 'system');
+                        break;
+                    case 'content_chunk':
+                        this.addMessage(data.data.content, 'assistant');
+                        break;
+                    case 'tool_usage':
+                        this.addMessage(`Tool usage: ${data.data.message}`, 'tool');
+                        break;
+                    case 'error':
+                        this.addMessage(`Error: ${data.data.message}`, 'error');
+                        break;
+                    case 'processing_started':
+                        this.addMessage('Processing your message...', 'system');
+                        break;
+                    case 'processing_complete':
+                        this.addMessage('Message processing complete', 'system');
+                        break;
+                    default:
+                        this.addMessage(`Received unknown message type: ${data.type}`, 'system');
+                }
+            }
+
+            sendMessage() {
+                if (!this.connected) {
+                    this.addMessage('Not connected to WebSocket server', 'error');
+                    return;
+                }
+
+                const messageInput = document.getElementById('messageInput');
+                const message = messageInput.value.trim();
+
+                if (!message) {
+                    return;
+                }
+
+                this.addMessage(message, 'user');
+                messageInput.value = '';
+
+                this.ws.send(JSON.stringify({
+                    type: 'chat_message',
+                    message: message
+                }));
+            }
+
+            addMessage(message, type) {
+                const chatMessages = document.getElementById('chatMessages');
+                const messageDiv = document.createElement('div');
+                messageDiv.className = `mb-2 ${this.getMessageClass(type)}`;
+                messageDiv.textContent = message;
+                chatMessages.appendChild(messageDiv);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            }
+
+            getMessageClass(type) {
+                switch (type) {
+                    case 'user':
+                        return 'text-blue-600 font-medium';
+                    case 'assistant':
+                        return 'text-green-600';
+                    case 'system':
+                        return 'text-gray-500 italic';
+                    case 'error':
+                        return 'text-red-600';
+                    case 'tool':
+                        return 'text-purple-600';
+                    default:
+                        return 'text-gray-700';
+                }
+            }
+        }
+
+        // Initialize the UI when the page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            new AssistantBridgeUI();
+        });
+    </script>
+</body>
+</html> 

@@ -1,9 +1,9 @@
 from typing import Optional, Dict, Any
 import asyncio
 from log import logger
-from openai_agents.runner import Runner
-from openai_agents.message_output_item import MessageOutputItem
-from openai_agents.stream_event import StreamEvent
+from agents.runner import Runner
+from agents.message_output_item import MessageOutputItem
+from agents.stream_event import StreamEvent
 
 class AgentManagement:
     def __init__(self, agent):

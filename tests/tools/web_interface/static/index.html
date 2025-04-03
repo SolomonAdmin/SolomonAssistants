@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Assistant Bridge - Connection Settings</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center">
+    <div class="container mx-auto px-4 py-8 max-w-md">
+        <div class="bg-white rounded-lg shadow-md p-8">
+            <h1 class="text-3xl font-bold mb-8 text-center">Assistant Bridge</h1>
+            
+            <!-- Connection Form -->
+            <div class="space-y-6">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">OpenAI API Key</label>
+                    <input type="password" id="apiKey" class="w-full px-4 py-2 rounded-md border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-colors" placeholder="Enter your OpenAI API key">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Assistant ID</label>
+                    <input type="text" id="assistantId" class="w-full px-4 py-2 rounded-md border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-colors" placeholder="Enter your Assistant ID">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Vector Store ID (Optional)</label>
+                    <input type="text" id="vectorStoreId" class="w-full px-4 py-2 rounded-md border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-colors" placeholder="Enter Vector Store ID">
+                </div>
+                <button id="connectBtn" class="w-full bg-blue-500 text-white px-6 py-3 rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors">
+                    Connect to Assistant
+                </button>
+            </div>
+        </div>
+    </div>
+    <script src="/static/connection.js"></script>
+</body>
+</html> 

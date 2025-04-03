@@ -1,6 +1,8 @@
 # services/service_db.py
 
+from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
+from sqlalchemy.orm import sessionmaker
 from sqlalchemy.exc import SQLAlchemyError
 from rds_db_connection import DatabaseConnector
 import logging

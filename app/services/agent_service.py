@@ -1,17 +1,23 @@
 from typing import Optional, Dict, Any, AsyncGenerator, List
+from datetime import datetime
 import asyncio
 import logging
 from dataclasses import dataclass
 from openai import AsyncOpenAI
 
 # Import from agents SDK 
-from agents import Agent, ModelSettings
-from agents.run import Runner
+from app.agents.agent import Agent, ModelSettings
+from app.agents.runner import Runner
+from app.agents.openai_responses_model import OpenAIResponsesModel
+from app.agents.message_output_item import MessageOutputItem
+from app.agents.stream_event import StreamEvent
 
 # Import local services
 from .model_management import ModelManagementService
 from .tool_management import ToolManagementService
 from .workato_integration import WorkatoIntegration
+from .tools.memory_tool import MemoryTool
+from .session_memory import SessionMemory
 
 logger = logging.getLogger(__name__)
 
@@ -21,140 +27,146 @@ class StreamEvent:
     type: str
     data: Dict[str, Any]
 
+AGENTS_SDK_AVAILABLE = True
+
 class AgentService:
     """Service for managing and running Agents."""
     
     def __init__(self, api_key: str):
-        """Initialize the agent service with API key."""
+        """Initialize with an API key."""
         self.api_key = api_key
-        self.model_service = ModelManagementService()
-        self.tool_service = ToolManagementService()
         self.agent = None
+        self.openai_client = AsyncOpenAI(api_key=api_key)
+        self.session_memory = SessionMemory()
         self.initialized = False
-        
+    
     async def initialize(self, 
-                         assistant_id: str, 
-                         vector_store_ids: Optional[List[str]] = None,
-                         workato_integration: Optional[WorkatoIntegration] = None) -> bool:
-        """
-        Initialize the agent with the specified assistant ID.
-        
-        Args:
-            assistant_id: OpenAI Assistant ID to use for configuration
-            vector_store_ids: Optional list of vector store IDs
-            workato_integration: Optional Workato integration for tools
+                        assistant_id: str, 
+                        vector_store_ids: Optional[List[str]] = None,
+                        workato_integration: Optional[Any] = None) -> bool:
+        """Initialize the agent service with optional integrations."""
+        if not AGENTS_SDK_AVAILABLE:
+            logger.warning("Agents SDK not available")
+            return False
             
-        Returns:
-            True if initialization was successful
-        """
         try:
-            # Create OpenAI client
-            client = AsyncOpenAI(api_key=self.api_key)
+            # Get assistant details
+            assistant = await self.openai_client.beta.assistants.retrieve(assistant_id)
             
-            # Fetch the assistant to get its configuration
-            assistant = await client.beta.assistants.retrieve(assistant_id)
-            
-            # Initialize tools
+            # Configure tools
             tools = []
             
-            # Add WebSearchTool
-            from agents import WebSearchTool
-            web_search_tool = WebSearchTool()
-            tools.append(web_search_tool)
-            logger.info(f"Added WebSearchTool: {web_search_tool.name}")
+            # Add memory tool
+            memory_tool = MemoryTool(self.session_memory)
+            tools.append(memory_tool)
             
-            # Add FileSearchTool if vector store IDs are provided
+            # Add other tools...
             if vector_store_ids:
-                from agents import FileSearchTool
-                file_search_tool = FileSearchTool(vector_store_ids=vector_store_ids)
-                tools.append(file_search_tool)
-                logger.info(f"Added FileSearchTool with vector stores: {vector_store_ids}")
+                for vs_id in vector_store_ids:
+                    file_search = FileSearchTool(vector_store_id=vs_id)
+                    tools.append(file_search)
             
-            # Add Workato tools if integration is provided
             if workato_integration:
                 workato_tools = workato_integration.get_tools()
                 tools.extend(workato_tools)
-                logger.info(f"Added {len(workato_tools)} Workato integration tools")
             
-            # Create model
-            model = self.model_service.create_model(
-                api_key=self.api_key,
-                model_name=assistant.model
+            # Create the model
+            model = OpenAIResponsesModel(
+                openai_client=self.openai_client,
+                model=assistant.model
             )
-            
-            # Enhance instructions to mention web search capability
-            enhanced_instructions = assistant.instructions
-            if not "web search" in enhanced_instructions.lower():
-                enhanced_instructions += "\nYou have the ability to search the web for real-time information when needed."
             
             # Create the agent
             self.agent = Agent(
                 name=assistant.name or "Assistant",
-                instructions=enhanced_instructions,
+                instructions=assistant.instructions,
                 tools=tools,
-                model=model,
-                model_settings=ModelSettings(temperature=0.7, max_tokens=1000)
+                model=model
             )
             
             self.initialized = True
-            logger.info(f"Agent initialized with assistant ID: {assistant_id}")
+            logger.info(f"Agent initialized from assistant {assistant_id}")
             return True
             
         except Exception as e:
             logger.error(f"Error initializing agent: {str(e)}")
-            self.initialized = False
             raise
+    
+    def _prepare_context_with_history(self, user_input: str, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Prepare context with conversation history and memory."""
+        context = context or {}
+        
+        # Get recent conversation history
+        recent_history = self.session_memory.get_recent_context(n_messages=5)
+        
+        # Get all persistent memory slots
+        memory_data = self.session_memory.get_all()
+        
+        # Prepare context with both conversation history and memory slots
+        context.update({
+            "conversation_history": recent_history,
+            "session_memory": {k: v for k, v in memory_data.items() if v is not None and k != "conversation_history"},
+            "current_input": user_input
+        })
+        
+        return context
+    
+    def _save_interaction(self, user_input: str, assistant_response: str) -> None:
+        """Save the interaction to conversation history."""
+        # Save user message
+        self.session_memory.add_to_history({
+            "role": "user",
+            "content": user_input
+        })
+        
+        # Save assistant response
+        self.session_memory.add_to_history({
+            "role": "assistant",
+            "content": assistant_response
+        })
     
     async def run_existing_agent(
         self,
         input_text: str,
         context: Optional[Dict[str, Any]] = None
     ) -> str:
-        """
-        Run the agent with the given input text.
-        
-        Args:
-            input_text: The text to process
-            context: Optional context data
-            
-        Returns:
-            The response from the agent
-        """
+        """Run the agent with the given input text and context."""
         if not self.agent or not self.initialized:
             raise ValueError("Agent not initialized. Call initialize() first.")
         
         try:
+            # Prepare context with history
+            enriched_context = self._prepare_context_with_history(input_text, context)
+            
             # Run the agent
             result = await Runner.run(
                 starting_agent=self.agent,
                 input=input_text,
-                context=context or {}
+                context=enriched_context
             )
             
             # Extract the output from the result
             output = ""
             if result.new_items:
                 for item in reversed(result.new_items):
-                    # Find a MessageOutputItem to get the final response
-                    if hasattr(item, 'message') and hasattr(item.message, 'content'):
-                        output = item.message.content
-                        break
-                    # Check if raw_item exists and extract content
-                    elif hasattr(item, 'raw_item'):
-                        if hasattr(item.raw_item, 'content') and isinstance(item.raw_item.content, list):
-                            # Combine all text from content items
-                            content_texts = []
-                            for content_item in item.raw_item.content:
-                                if hasattr(content_item, 'text'):
-                                    content_texts.append(content_item.text)
-                            
-                            if content_texts:
-                                output = "\n".join(content_texts)
-                                break
-                    # Direct access to text attribute as a fallback
-                    elif hasattr(item, 'text'):
-                        output = item.text
-                        break
+                    if isinstance(item, MessageOutputItem):
+                        if hasattr(item, 'message') and hasattr(item.message, 'content'):
+                            output = item.message.content
+                            break
+                        elif hasattr(item, 'raw_item'):
+                            if hasattr(item.raw_item, 'content') and isinstance(item.raw_item.content, list):
+                                content_texts = []
+                                for content_item in item.raw_item.content:
+                                    if hasattr(content_item, 'text'):
+                                        content_texts.append(content_item.text)
+                                
+                                if content_texts:
+                                    output = "\n".join(content_texts)
+                                    break
+            
+            # Save the interaction to history
+            if output:
+                self._save_interaction(input_text, output)
             
             return output
             
@@ -167,83 +179,32 @@ class AgentService:
         input_text: str,
         context: Optional[Dict[str, Any]] = None
     ) -> AsyncGenerator[StreamEvent, None]:
-        """
-        Run the agent with the given input text and simulate streaming responses.
-        
-        Args:
-            input_text: The text to process
-            context: Optional context data
-            
-        Yields:
-            StreamEvent objects containing chunks of the response
-        """
+        """Run the agent with streaming enabled."""
         if not self.agent or not self.initialized:
             raise ValueError("Agent not initialized. Call initialize() first.")
         
         try:
+            # Prepare context with history
+            enriched_context = self._prepare_context_with_history(input_text, context)
+            
             # First yield a starting event
-            yield StreamEvent(type="start", data={"message": "Starting agent processing"})
+            yield StreamEvent(type="system", data={"message": "Starting agent processing"})
             
-            # Run the agent - get the complete response without streaming
-            # (We'll simulate streaming since the SDK might not support actual streaming)
-            result = await Runner.run(
-                starting_agent=self.agent,
-                input=input_text,
-                context=context or {}
-            )
+            # Collect the full response for history
+            full_response = []
             
-            # Extract the output from the result
-            output = ""
-            if result.new_items:
-                for item in reversed(result.new_items):
-                    # Find a MessageOutputItem to get the final response
-                    if hasattr(item, 'message') and hasattr(item.message, 'content'):
-                        output = item.message.content
-                        break
-                    # Check if raw_item exists and extract content
-                    elif hasattr(item, 'raw_item'):
-                        if hasattr(item.raw_item, 'content') and isinstance(item.raw_item.content, list):
-                            # Combine all text from content items
-                            content_texts = []
-                            for content_item in item.raw_item.content:
-                                if hasattr(content_item, 'text'):
-                                    content_texts.append(content_item.text)
-                            
-                            if content_texts:
-                                output = "\n".join(content_texts)
-                                break
-                    # Direct access to text attribute as a fallback
-                    elif hasattr(item, 'text'):
-                        output = item.text
-                        break
+            # Get the agent's response using streaming
+            async for content in self.agent.run_stream(input_text, enriched_context):
+                full_response.append(content)
+                yield StreamEvent(type="content_chunk", data={"content": content})
             
-            # If we have an output, simulate streaming by breaking it into chunks
-            if output:
-                # Track tool usage to simulate tool events
-                tool_mentioned = False
-                
-                # Break the output into sentences
-                sentences = output.split(". ")
-                
-                for i, sentence in enumerate(sentences):
-                    # Add the period back except for the last sentence
-                    if i < len(sentences) - 1:
-                        sentence += "."
-                    
-                    # If the sentence mentions tools and we haven't simulated a tool event yet
-                    if ("tool" in sentence.lower() or "search" in sentence.lower()) and not tool_mentioned:
-                        yield StreamEvent(type="tool_event", data={"message": "Using a tool"})
-                        tool_mentioned = True
-                    
-                    # Yield the sentence as a content chunk
-                    yield StreamEvent(type="content_chunk", data={"content": sentence + " "})
-                    
-                    # Add a small delay to simulate real streaming
-                    await asyncio.sleep(0.05)
+            # Save the complete interaction to history
+            if full_response:
+                self._save_interaction(input_text, "".join(full_response))
             
-            # Yield a completion event
-            yield StreamEvent(type="completion", data={"message": "Processing complete"})
+            # Final completion event
+            yield StreamEvent(type="completion", data={"message": "Processing completed"})
             
         except Exception as e:
-            logger.error(f"Error in streaming agent run: {str(e)}")
+            logger.error(f"Error in streaming: {str(e)}")
             raise 

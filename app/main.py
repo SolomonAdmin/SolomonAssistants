@@ -3,23 +3,24 @@ import os
 import json
 from pathlib import Path
 from typing import List, Dict, Any
-from fastapi import FastAPI, HTTPException, Depends, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from router import router
-from routers.healthcheck import router_health_check
-from fastapi.responses import Response
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse, Response
+import logging
+from app.router import router
+from app.routers.healthcheck import router_health_check
 import yaml
 import functools
-import logging
-
-# Add the parent directory to sys.path to make 'tools' module discoverable
-sys.path.append(str(Path(__file__).parent.parent))
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Add the parent directory to sys.path to make 'tools' module discoverable
+sys.path.append(str(Path(__file__).parent.parent))
 
 # Initialize the FastAPI application
 app = FastAPI(title="OpenAPI Assistants V2.0", version="0.1.0")
@@ -33,9 +34,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include routers
-app.include_router(router_health_check)
-app.include_router(router)
+# Mount static files for the test interface
+static_dir = Path(__file__).parent.parent / "tests" / "tools" / "web_interface" / "static"
+app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+
+# Root endpoint to serve the test interface
+@app.get("/")
+async def read_root():
+    return FileResponse(str(static_dir / "index.html"))
 
 # WebSocket connection manager
 class ConnectionManager:
@@ -52,13 +58,6 @@ class ConnectionManager:
             self.active_connections.remove(websocket)
             logger.info(f"WebSocket disconnected. Remaining connections: {len(self.active_connections)}")
         
-    async def send_personal_message(self, message: str, websocket: WebSocket):
-        await websocket.send_text(message)
-        
-    async def broadcast(self, message: str):
-        for connection in self.active_connections:
-            await connection.send_text(message)
-    
     async def send_json(self, data: Dict[str, Any], websocket: WebSocket):
         await websocket.send_json(data)
 
@@ -79,7 +78,7 @@ async def websocket_endpoint(websocket: WebSocket, assistant_id: str):
             }
         }, websocket)
         
-        from app.services.assistant_bridge import AssistantBridge, StreamEvent
+        from app.services.assistant_bridge import AssistantBridge
         
         # Maintain the bridge instance for this connection
         bridge = None
@@ -191,56 +190,9 @@ async def websocket_endpoint(websocket: WebSocket, assistant_id: str):
     except WebSocketDisconnect:
         manager.disconnect(websocket)
     except Exception as e:
-        logger.error(f"WebSocket error: {str(e)}")
-        try:
-            await manager.send_json({
-                "type": "error",
-                "data": {"message": f"Unexpected error: {str(e)}"}
-            }, websocket)
-        except:
-            pass
+        logger.error(f"Error in websocket_endpoint: {str(e)}")
         manager.disconnect(websocket)
 
-# Customize OpenAPI schema
-def custom_openapi():
-    if app.openapi_schema:
-        return app.openapi_schema
-    openapi_schema = get_openapi(
-        title="OpenAPI Assistants V2.0",
-        version="0.1.0",
-        description="REST API and WebSocket interface for OpenAI Assistants",
-        routes=app.routes,
-    )
-    openapi_schema["components"]["securitySchemes"] = {
-        "BearerAuth": {
-            "type": "http",
-            "scheme": "bearer",
-            "bearerFormat": "JWT",
-        }
-    }
-    openapi_schema["security"] = [{"BearerAuth": []}]
-    app.openapi_schema = openapi_schema
-    return app.openapi_schema
-
-app.openapi = custom_openapi
-
-@app.get("/openapi.yaml")
-@functools.lru_cache()
-def get_openapi_yaml() -> Response:
-    openapi_json = app.openapi()  # Get the OpenAPI JSON spec
-    yaml_output = yaml.dump(openapi_json)  # Convert JSON to YAML
-    return Response(content=yaml_output, media_type="text/x-yaml")
-
-# Debug middleware to log requests
-@app.middleware("http")
-async def log_requests(request, call_next):
-    print(f"Received request: {request.method} {request.url}")
-    print("Headers:")
-    for name, value in request.headers.items():
-        print(f"{name}: {value}")
-    response = await call_next(request)
-    return response
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8080)
+# Include routers
+app.include_router(router_health_check)
+app.include_router(router)
