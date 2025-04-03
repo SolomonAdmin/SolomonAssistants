@@ -48,9 +48,11 @@ class ConnectionParams(BaseModel):
     api_key: str
     assistant_id: str
     vector_store_ids: Optional[List[str]] = None
+    thread_id: Optional[str] = None  # Add thread_id to support conversation persistence
 
-# Store active connections
+# Store active connections and their associated thread IDs
 active_connections: Dict[str, AssistantBridge] = {}
+thread_connections: Dict[str, str] = {}  # Maps thread_ids to connection_ids
 
 # Authentication dependency
 async def get_api_key(x_api_key: str = Header(None)):
@@ -85,6 +87,7 @@ async def websocket_endpoint(websocket: WebSocket):
         api_key = params.get("api_key")
         assistant_id = params.get("assistant_id")
         vector_store_ids = params.get("vector_store_ids")
+        thread_id = params.get("thread_id")  # Get thread_id if provided
         
         try:
             bridge = AssistantBridge(
@@ -94,13 +97,25 @@ async def websocket_endpoint(websocket: WebSocket):
             )
             await bridge.initialize(workato_config=WORKATO_CONFIG)
             
-            # Store the bridge instance
+            # If thread_id is provided, restore the conversation state
+            if thread_id:
+                bridge.session_memory.set_thread_id(thread_id)
+                # Load any existing conversation history for this thread
+                # (assuming you have implemented this in your storage layer)
+            else:
+                # Generate new thread_id for new conversations
+                thread_id = str(uuid.uuid4())
+                bridge.session_memory.set_thread_id(thread_id)
+            
+            # Store the bridge instance and thread mapping
             active_connections[connection_id] = bridge
+            thread_connections[thread_id] = connection_id
             
             # Notify client that the assistant is ready
             await websocket.send_json({
                 "type": "ready",
-                "message": "Assistant initialized successfully"
+                "message": "Assistant initialized successfully",
+                "thread_id": thread_id
             })
             
             # Process messages
@@ -141,6 +156,10 @@ async def websocket_endpoint(websocket: WebSocket):
                         "message": "Processing your message..."
                     })
                     
+                    # Add any context from the client
+                    context = message_data.get("context", {})
+                    context["thread_id"] = thread_id
+                    
                     # Handle streaming response
                     if message_data.get("stream", True):
                         try:
@@ -148,7 +167,7 @@ async def websocket_endpoint(websocket: WebSocket):
                             tool_used = False
                             full_response = ""
                             
-                            async for chunk, event_type in bridge.chat_streaming(user_input):
+                            async for chunk, event_type in bridge.chat_streaming(user_input, context):
                                 if event_type == "raw_response" or event_type == "message":
                                     # Text content
                                     await websocket.send_json({
@@ -177,7 +196,8 @@ async def websocket_endpoint(websocket: WebSocket):
                             await websocket.send_json({
                                 "type": "completion",
                                 "content": full_response,
-                                "tool_used": tool_used
+                                "tool_used": tool_used,
+                                "thread_id": thread_id
                             })
                             
                         except Exception as e:
@@ -189,16 +209,17 @@ async def websocket_endpoint(websocket: WebSocket):
                     else:
                         # Handle non-streaming response
                         try:
-                            response = await bridge.chat(user_input)
+                            response = await bridge.chat(user_input, context)
                             await websocket.send_json({
                                 "type": "response",
-                                "content": response
+                                "content": response,
+                                "thread_id": thread_id
                             })
                         except Exception as e:
                             logger.error(f"Error during chat: {str(e)}")
                             await websocket.send_json({
                                 "type": "error",
-                                "error": f"Error during chat: {str(e)}"
+                                "error": f"Error processing message: {str(e)}"
                             })
                 
         except Exception as e:
@@ -212,26 +233,19 @@ async def websocket_endpoint(websocket: WebSocket):
     
     except WebSocketDisconnect:
         logger.info(f"Client disconnected: {connection_id}")
-        # Clean up resources
-        if connection_id in active_connections:
-            del active_connections[connection_id]
-    
     except Exception as e:
-        logger.error(f"Error in WebSocket connection: {str(e)}")
-        try:
-            await websocket.send_json({
-                "type": "error",
-                "error": f"Unexpected error: {str(e)}"
-            })
-        except:
-            pass
-        
-        # Clean up resources
+        logger.error(f"Error in websocket connection: {str(e)}")
+    finally:
+        # Clean up connection
         if connection_id in active_connections:
-            del active_connections[connection_id]
+            bridge = active_connections[connection_id]
+            thread_id = bridge.session_memory.get_thread_id()
+            if thread_id:
+                thread_connections.pop(thread_id, None)
+            active_connections.pop(connection_id)
 
 @app.on_event("shutdown")
 async def shutdown_event():
-    """Clean up resources on application shutdown."""
-    logger.info("Application shutting down, cleaning up resources")
-    active_connections.clear() 
+    """Clean up resources on shutdown."""
+    active_connections.clear()
+    thread_connections.clear() 

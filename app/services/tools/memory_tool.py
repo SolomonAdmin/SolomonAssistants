@@ -1,4 +1,4 @@
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from app.agents.tool import FunctionTool
 from ..session_memory import SessionMemory
 
@@ -25,7 +25,8 @@ class MemoryTool(FunctionTool):
                             "current_automation",
                             "automation_goals",
                             "key_metrics",
-                            "has_automation_owner"
+                            "has_automation_owner",
+                            "thread_id"
                         ]
                     },
                     "value": {
@@ -42,6 +43,14 @@ class MemoryTool(FunctionTool):
         """Update the specified memory slot with the given value."""
         self.session_memory.update(key, value)
         return f"Updated memory slot '{key}' with value: {value}"
+    
+    def add_message_to_history(self, message: Dict[str, Any]) -> None:
+        """Add a message to the conversation history."""
+        self.session_memory.add_to_history(message)
+    
+    def get_conversation_context(self, n_messages: int = 5) -> List[Dict[str, Any]]:
+        """Get recent conversation context."""
+        return self.session_memory.get_recent_context(n_messages)
         
     def to_dict(self) -> Dict[str, Any]:
         """Convert the tool to a dictionary format for OpenAI API."""

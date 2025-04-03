@@ -1,4 +1,5 @@
 from typing import Optional, Dict, Any, AsyncGenerator, List
+from datetime import datetime
 import asyncio
 import logging
 from dataclasses import dataclass
@@ -91,6 +92,39 @@ class AgentService:
             logger.error(f"Error initializing agent: {str(e)}")
             raise
     
+    def _prepare_context_with_history(self, user_input: str, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Prepare context with conversation history and memory."""
+        context = context or {}
+        
+        # Get recent conversation history
+        recent_history = self.session_memory.get_recent_context(n_messages=5)
+        
+        # Get all persistent memory slots
+        memory_data = self.session_memory.get_all()
+        
+        # Prepare context with both conversation history and memory slots
+        context.update({
+            "conversation_history": recent_history,
+            "session_memory": {k: v for k, v in memory_data.items() if v is not None and k != "conversation_history"},
+            "current_input": user_input
+        })
+        
+        return context
+    
+    def _save_interaction(self, user_input: str, assistant_response: str) -> None:
+        """Save the interaction to conversation history."""
+        # Save user message
+        self.session_memory.add_to_history({
+            "role": "user",
+            "content": user_input
+        })
+        
+        # Save assistant response
+        self.session_memory.add_to_history({
+            "role": "assistant",
+            "content": assistant_response
+        })
+    
     async def run_existing_agent(
         self,
         input_text: str,
@@ -101,30 +135,26 @@ class AgentService:
             raise ValueError("Agent not initialized. Call initialize() first.")
         
         try:
-            # Add session memory to context
-            context = context or {}
-            context["session_memory"] = self.session_memory.get_all()
+            # Prepare context with history
+            enriched_context = self._prepare_context_with_history(input_text, context)
             
             # Run the agent
             result = await Runner.run(
                 starting_agent=self.agent,
                 input=input_text,
-                context=context
+                context=enriched_context
             )
             
             # Extract the output from the result
             output = ""
             if result.new_items:
                 for item in reversed(result.new_items):
-                    # Find a MessageOutputItem to get the final response
                     if isinstance(item, MessageOutputItem):
                         if hasattr(item, 'message') and hasattr(item.message, 'content'):
                             output = item.message.content
                             break
-                        # Fallback to raw_item if available
                         elif hasattr(item, 'raw_item'):
                             if hasattr(item.raw_item, 'content') and isinstance(item.raw_item.content, list):
-                                # Combine all text from content items
                                 content_texts = []
                                 for content_item in item.raw_item.content:
                                     if hasattr(content_item, 'text'):
@@ -133,6 +163,10 @@ class AgentService:
                                 if content_texts:
                                     output = "\n".join(content_texts)
                                     break
+            
+            # Save the interaction to history
+            if output:
+                self._save_interaction(input_text, output)
             
             return output
             
@@ -150,16 +184,23 @@ class AgentService:
             raise ValueError("Agent not initialized. Call initialize() first.")
         
         try:
-            # Add session memory to context
-            context = context or {}
-            context["session_memory"] = self.session_memory.get_all()
+            # Prepare context with history
+            enriched_context = self._prepare_context_with_history(input_text, context)
             
             # First yield a starting event
             yield StreamEvent(type="system", data={"message": "Starting agent processing"})
             
+            # Collect the full response for history
+            full_response = []
+            
             # Get the agent's response using streaming
-            async for content in self.agent.run_stream(input_text, context):
+            async for content in self.agent.run_stream(input_text, enriched_context):
+                full_response.append(content)
                 yield StreamEvent(type="content_chunk", data={"content": content})
+            
+            # Save the complete interaction to history
+            if full_response:
+                self._save_interaction(input_text, "".join(full_response))
             
             # Final completion event
             yield StreamEvent(type="completion", data={"message": "Processing completed"})
