@@ -1,9 +1,18 @@
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List, Union, Tuple, AsyncGenerator
 import asyncio
 from log import logger
-from agents.runner import Runner
+from agents import (
+    Agent, 
+    Tool,
+    OpenAIChatCompletionsModel,
+    OpenAIResponsesModel,
+    StreamEvent,
+    Runner,
+    function_tool,
+    FileSearchTool
+)
+from app.agents.tools import WebSearchTool
 from agents.message_output_item import MessageOutputItem
-from agents.stream_event import StreamEvent
 
 class AgentManagement:
     def __init__(self, agent):

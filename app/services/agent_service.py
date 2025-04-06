@@ -11,6 +11,8 @@ from app.agents.runner import Runner
 from app.agents.openai_responses_model import OpenAIResponsesModel
 from app.agents.message_output_item import MessageOutputItem
 from app.agents.stream_event import StreamEvent
+from app.agents.tools import WebSearchTool, FileSearchToolWrapper
+from agents import FileSearchTool  # Import FileSearchTool from external package
 
 # Import local services
 from .model_management import ModelManagementService
@@ -60,11 +62,54 @@ class AgentService:
             memory_tool = MemoryTool(self.session_memory)
             tools.append(memory_tool)
             
+            # Add web search tool with the API key
+            web_search_tool = WebSearchTool()
+            # Set the client directly to ensure it has access to the API key
+            web_search_tool.client = self.openai_client
+            tools.append(web_search_tool)
+            logger.info("Added WebSearchTool to agent tools")
+            
             # Add other tools...
             if vector_store_ids:
+                logger.info(f"Attempting to add FileSearchTool with vector_store_ids: {vector_store_ids}")
+                # Check FileSearchTool parameters
+                import inspect
+                try:
+                    sig = inspect.signature(FileSearchTool.__init__)
+                    logger.info(f"FileSearchTool parameters: {list(sig.parameters.keys())}")
+                except Exception as e:
+                    logger.error(f"Error inspecting FileSearchTool: {str(e)}")
+                
                 for vs_id in vector_store_ids:
-                    file_search = FileSearchTool(vector_store_id=vs_id)
-                    tools.append(file_search)
+                    try:
+                        logger.info(f"Creating FileSearchTool with vector_store_id: {vs_id}")
+                        # Try both parameter names
+                        try:
+                            # Try singular version first (most common)
+                            original_tool = FileSearchTool(vector_store_id=vs_id)
+                            logger.info("Created original FileSearchTool with singular parameter 'vector_store_id'")
+                        except TypeError:
+                            try:
+                                # If that fails, try plural version
+                                original_tool = FileSearchTool(vector_store_ids=[vs_id])
+                                logger.info("Created original FileSearchTool with plural parameter 'vector_store_ids'")
+                            except Exception as e:
+                                logger.error(f"Could not create FileSearchTool with either parameter name: {str(e)}")
+                                continue
+                        
+                        # Wrap the original tool with our wrapper
+                        file_search = FileSearchToolWrapper(original_tool, vs_id)
+                        
+                        # Ensure it has access to the OpenAI client if needed
+                        file_search.client = self.openai_client
+                        logger.info("Set OpenAI client for FileSearchToolWrapper")
+                        
+                        tools.append(file_search)
+                        logger.info(f"Successfully added FileSearchToolWrapper with vector_store_id: {vs_id}")
+                    except Exception as e:
+                        logger.error(f"Error creating FileSearchTool with vector_store_id {vs_id}: {str(e)}")
+            else:
+                logger.info("No vector_store_ids provided, skipping FileSearchTool")
             
             if workato_integration:
                 workato_tools = workato_integration.get_tools()
@@ -75,11 +120,18 @@ class AgentService:
                 openai_client=self.openai_client,
                 model=assistant.model
             )
+            model.model_settings = ModelSettings(temperature=0.7, max_tokens=1000)
             
             # Create the agent
+            instructions = assistant.instructions + "\nYou have access to a web_search tool to find current information. When users ask about news (e.g., 'search for IPaaS news'), use the web_search tool with query parameter containing the search terms. Always include the query parameter in proper JSON format like this: {\"query\": \"IPaaS news\"}. After receiving the search results, share them with the user immediately and completely."
+            
+            # Add file search instructions if available
+            if vector_store_ids:
+                instructions += "\n\nYou also have access to a file_search tool to search documents in the vector database. ALWAYS use this tool when users ask about documents, files, or what data you have access to. When you see the file_search results, quote them directly to the user - they contain important information about available documents. Examples of when to use file_search:\n- 'What documents do you have?'\n- 'Can you give me an overview of your files?'\n- 'Search for X in your documents'\n\nTo use the file_search tool, pass a query parameter in proper JSON format like this: {\"query\": \"document overview\"}. NEVER respond that you don't have access to documents - ALWAYS use the file_search tool and share its full response with the user."
+            
             self.agent = Agent(
                 name=assistant.name or "Assistant",
-                instructions=assistant.instructions,
+                instructions=instructions,
                 tools=tools,
                 model=model
             )

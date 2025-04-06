@@ -84,8 +84,8 @@ async def websocket_endpoint(websocket: WebSocket, assistant_id: str):
                 
                 try:
                     agent_service = AgentService(api_key=api_key)
-                    await agent_service.initialize(assistant_id)
-                    logger.info("Agent service initialized")
+                    await agent_service.initialize(assistant_id, vector_store_ids=vector_store_ids)
+                    logger.info(f"Agent service initialized with vector_store_ids: {vector_store_ids}")
                     
                     await websocket.send_json({
                         "type": "initialized"
