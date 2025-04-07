@@ -88,6 +88,11 @@
         <!-- Chat Interface -->
         <div class="bg-white rounded-lg shadow-md p-6">
             <h2 class="text-xl font-semibold mb-4">Chat Interface</h2>
+            <div class="flex justify-between items-center mb-4">
+                <button id="tts-toggle" class="bg-purple-500 text-white px-3 py-1 rounded-md hover:bg-purple-600 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2">
+                    Enable Voice
+                </button>
+            </div>
             <div class="space-y-4">
                 <div id="chatMessages" class="h-96 overflow-y-auto border rounded-md p-4 mb-4"></div>
                 <div class="flex space-x-4">
@@ -101,6 +106,23 @@
     </div>
 
     <script>
+        // Add TTS functionality variables
+        let isTtsEnabled = false;
+
+        function speak(text) {
+            if (isTtsEnabled && text && typeof text === 'string') {
+                // Skip system messages and user messages
+                if (!text.startsWith('Connected to') && 
+                    !text.startsWith('Connection established') && 
+                    !text.startsWith('Assistant bridge') && 
+                    !text.startsWith('Processing your') && 
+                    !text.startsWith('Message processing')) {
+                    const utterance = new SpeechSynthesisUtterance(text);
+                    speechSynthesis.speak(utterance);
+                }
+            }
+        }
+
         class AssistantBridgeUI {
             constructor() {
                 this.ws = null;
@@ -115,6 +137,15 @@
                     if (e.key === 'Enter') {
                         this.sendMessage();
                     }
+                });
+                
+                // Add TTS toggle button event listener
+                document.getElementById('tts-toggle').addEventListener('click', () => {
+                    isTtsEnabled = !isTtsEnabled;
+                    document.getElementById('tts-toggle').textContent = isTtsEnabled ? 'Disable Voice' : 'Enable Voice';
+                    document.getElementById('tts-toggle').classList.toggle('bg-purple-500', !isTtsEnabled);
+                    document.getElementById('tts-toggle').classList.toggle('bg-purple-700', isTtsEnabled);
+                    this.addMessage(isTtsEnabled ? 'Text-to-speech enabled' : 'Text-to-speech disabled', 'system');
                 });
             }
 
@@ -170,6 +201,8 @@
                         break;
                     case 'content_chunk':
                         this.addMessage(data.data.content, 'assistant');
+                        // Speak the content chunk
+                        speak(data.data.content);
                         break;
                     case 'tool_usage':
                         this.addMessage(`Tool usage: ${data.data.message}`, 'tool');

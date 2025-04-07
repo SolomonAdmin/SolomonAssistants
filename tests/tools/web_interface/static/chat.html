@@ -27,6 +27,56 @@
         .tooltip:hover .tooltip-content {
             visibility: visible;
         }
+        
+        /* Pulse animation for mic button */
+        @keyframes pulse {
+            0% {
+                box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+            }
+            70% {
+                box-shadow: 0 0 0 10px rgba(239, 68, 68, 0);
+            }
+            100% {
+                box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+            }
+        }
+        
+        .pulse-animation {
+            animation: pulse 1.5s infinite;
+        }
+        
+        /* Floating TTS button styles */
+        .floating-button {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 100;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background-color: #8b5cf6;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        
+        .floating-button:hover {
+            transform: scale(1.1);
+            box-shadow: 0 6px 16px rgba(0,0,0,0.2);
+        }
+        
+        .floating-button.active {
+            background-color: #6d28d9;
+        }
+        
+        .floating-button svg {
+            width: 30px;
+            height: 30px;
+        }
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen">
@@ -34,7 +84,16 @@
         <div class="bg-white rounded-lg shadow-md p-6 h-[90vh] flex flex-col">
             <!-- Header with system messages indicator and logout -->
             <div class="flex justify-between items-center mb-4 pb-2 border-b">
-                <h1 class="text-2xl font-bold">Assistant Bridge Chat</h1>
+                <div class="flex items-center space-x-3">
+                    <h1 class="text-2xl font-bold">Assistant Bridge Chat</h1>
+                    <!-- TTS button for agent responses -->
+                    <button id="tts-toggle" class="bg-purple-700 text-white px-3 py-1 rounded-md hover:bg-purple-600 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 transition-colors">
+                        <div class="flex items-center space-x-1">
+                            <span class="text-sm">🔊</span>
+                            <span class="text-sm">Auto-Speak: ON</span>
+                        </div>
+                    </button>
+                </div>
                 <div class="flex items-center space-x-4">
                     <div class="tooltip">
                         <div class="flex items-center text-gray-500 hover:text-gray-700 cursor-pointer">
@@ -61,10 +120,17 @@
             </div>
             
             <!-- Input Area -->
-            <div class="flex gap-4 items-center">
+            <div class="flex gap-2 items-center">
                 <input type="text" id="messageInput" 
                     class="flex-1 px-4 py-2 rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-colors" 
                     placeholder="Type your message...">
+                <button id="micBtn" 
+                    class="bg-gray-300 text-gray-600 px-3 py-2 rounded-lg hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-300 focus:ring-offset-2 transition-colors flex items-center justify-center"
+                    title="Press and hold to record your message">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                    </svg>
+                </button>
                 <button id="sendBtn" 
                     class="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors">
                     Send
@@ -98,6 +164,477 @@
             if (confirm('Are you sure you want to disconnect?')) {
                 sessionStorage.clear();
                 window.location.href = '/';
+            }
+        });
+        
+        // TTS functionality for assistant responses
+        let autoSpeakEnabled = true;
+        
+        // Function to speak text using browser's Web Speech API
+        function speakText(text) {
+            if (!autoSpeakEnabled) return;
+            
+            // Cancel any ongoing speech
+            if (window.speechSynthesis) {
+                window.speechSynthesis.cancel();
+            }
+            
+            // For very long texts, we need to chunk them as browsers have limits
+            const maxLength = 200; // Maximum chunk size
+            let textToSpeak = text;
+            
+            if (text.length > maxLength) {
+                // For longer texts, we'll use a chunking approach
+                console.log(`Text is ${text.length} chars long, breaking into chunks...`);
+                
+                // Break text into sentences or reasonable chunks
+                const chunks = breakTextIntoChunks(text, maxLength);
+                console.log(`Created ${chunks.length} chunks to speak`);
+                
+                // Speak each chunk
+                speakChunks(chunks, 0);
+                return;
+            }
+            
+            // For shorter texts, use the simple approach
+            const utterance = new SpeechSynthesisUtterance(textToSpeak);
+            
+            // Set voice properties
+            utterance.rate = 1.1;
+            utterance.pitch = 1.0;
+            utterance.volume = 1.0;
+            
+            // Try to use a good voice if available
+            const voices = window.speechSynthesis.getVoices();
+            const preferredVoices = ['Google UK English Female', 'Microsoft Zira', 'Samantha'];
+            
+            for (const preferredVoice of preferredVoices) {
+                const voice = voices.find(v => v.name === preferredVoice);
+                if (voice) {
+                    utterance.voice = voice;
+                    break;
+                }
+            }
+            
+            // Update system message with speech status
+            const systemMessagesList = document.getElementById('systemMessageList');
+            const messageItem = document.createElement('div');
+            messageItem.className = 'text-sm text-green-600 mb-1';
+            messageItem.textContent = 'Speaking response...';
+            systemMessagesList.appendChild(messageItem);
+            
+            // Set up the keepalive for Chrome's 15-second limit
+            const keepAlive = setInterval(() => {
+                if (window.speechSynthesis.paused) {
+                    window.speechSynthesis.resume();
+                }
+            }, 5000);
+            
+            // Clean up when speech ends
+            utterance.onend = () => {
+                clearInterval(keepAlive);
+            };
+            
+            // Start speaking
+            window.speechSynthesis.speak(utterance);
+        }
+        
+        // Helper function to break text into reasonable chunks
+        function breakTextIntoChunks(text, maxLength) {
+            const chunks = [];
+            let startPos = 0;
+            
+            while (startPos < text.length) {
+                // Try to find a good chunk boundary (end of sentence or clause)
+                let endPos = startPos + maxLength;
+                if (endPos >= text.length) {
+                    // Last chunk
+                    chunks.push(text.substring(startPos));
+                    break;
+                }
+                
+                // Look for a good breakpoint
+                let breakPoint = text.lastIndexOf('.', endPos);
+                if (breakPoint <= startPos) breakPoint = text.lastIndexOf('!', endPos);
+                if (breakPoint <= startPos) breakPoint = text.lastIndexOf('?', endPos);
+                if (breakPoint <= startPos) breakPoint = text.lastIndexOf(',', endPos);
+                if (breakPoint <= startPos) breakPoint = text.lastIndexOf(';', endPos);
+                if (breakPoint <= startPos) breakPoint = text.lastIndexOf(':', endPos);
+                if (breakPoint <= startPos) breakPoint = text.lastIndexOf(' ', endPos);
+                
+                // If no good breakpoint found, just use the max length
+                if (breakPoint <= startPos) breakPoint = endPos;
+                
+                // Add the chunk
+                chunks.push(text.substring(startPos, breakPoint + 1));
+                startPos = breakPoint + 1;
+            }
+            
+            return chunks;
+        }
+        
+        // Helper function to speak a series of chunks
+        function speakChunks(chunks, index) {
+            if (index >= chunks.length) return;
+            
+            const chunk = chunks[index];
+            const utterance = new SpeechSynthesisUtterance(chunk);
+            
+            // Set voice properties
+            utterance.rate = 1.1;
+            utterance.pitch = 1.0;
+            utterance.volume = 1.0;
+            
+            // Try to use a good voice if available
+            const voices = window.speechSynthesis.getVoices();
+            const preferredVoices = ['Google UK English Female', 'Microsoft Zira', 'Samantha'];
+            
+            for (const preferredVoice of preferredVoices) {
+                const voice = voices.find(v => v.name === preferredVoice);
+                if (voice) {
+                    utterance.voice = voice;
+                    break;
+                }
+            }
+            
+            // When this chunk ends, speak the next one
+            utterance.onend = () => {
+                speakChunks(chunks, index + 1);
+            };
+            
+            // If speech synthesis is canceled, don't continue with more chunks
+            utterance.onboundary = (event) => {
+                if (window.speechSynthesis.pending === false && 
+                    window.speechSynthesis.speaking === false) {
+                    return; // Speech was canceled
+                }
+            };
+            
+            // Update system message when starting first chunk
+            if (index === 0) {
+                const systemMessagesList = document.getElementById('systemMessageList');
+                const messageItem = document.createElement('div');
+                messageItem.className = 'text-sm text-green-600 mb-1';
+                messageItem.textContent = `Speaking response (chunk ${index + 1}/${chunks.length})...`;
+                systemMessagesList.appendChild(messageItem);
+            }
+            
+            // Speak this chunk
+            window.speechSynthesis.speak(utterance);
+        }
+        
+        // Setup TTS toggle button
+        document.addEventListener('DOMContentLoaded', () => {
+            const ttsToggle = document.getElementById('tts-toggle');
+            
+            // Initialize voices when page loads (needed for some browsers)
+            if (window.speechSynthesis) {
+                // Ensure voices are loaded
+                if (window.speechSynthesis.getVoices().length === 0) {
+                    window.speechSynthesis.onvoiceschanged = () => {
+                        window.speechSynthesis.getVoices();
+                    };
+                }
+            }
+            
+            if (ttsToggle) {
+                // Set initial state to active since autoSpeakEnabled is true by default
+                ttsToggle.classList.remove('bg-purple-500');
+                ttsToggle.classList.add('bg-purple-700');
+                
+                // Add system message that auto-speak is enabled
+                const systemMessagesList = document.getElementById('systemMessageList');
+                const messageItem = document.createElement('div');
+                messageItem.className = 'text-sm text-purple-600 mb-1';
+                messageItem.textContent = 'Auto-speak enabled. Assistant responses will be read aloud.';
+                systemMessagesList.appendChild(messageItem);
+                
+                ttsToggle.addEventListener('click', () => {
+                    autoSpeakEnabled = !autoSpeakEnabled;
+                    
+                    if (autoSpeakEnabled) {
+                        // Enable auto-speak
+                        ttsToggle.classList.remove('bg-purple-500');
+                        ttsToggle.classList.add('bg-purple-700');
+                        ttsToggle.querySelector('span:last-child').textContent = 'Auto-Speak: ON';
+                        
+                        // Inform user
+                        const systemMessagesList = document.getElementById('systemMessageList');
+                        const messageItem = document.createElement('div');
+                        messageItem.className = 'text-sm text-purple-600 mb-1';
+                        messageItem.textContent = 'Auto-speak enabled. Assistant responses will be read aloud.';
+                        systemMessagesList.appendChild(messageItem);
+                    } else {
+                        // Disable auto-speak
+                        ttsToggle.classList.remove('bg-purple-700');
+                        ttsToggle.classList.add('bg-purple-500');
+                        ttsToggle.querySelector('span:last-child').textContent = 'Auto-Speak: OFF';
+                        
+                        // Stop any current speech
+                        if (window.speechSynthesis) {
+                            window.speechSynthesis.cancel();
+                        }
+                        
+                        // Inform user
+                        const systemMessagesList = document.getElementById('systemMessageList');
+                        const messageItem = document.createElement('div');
+                        messageItem.className = 'text-sm text-gray-600 mb-1';
+                        messageItem.textContent = 'Auto-speak disabled.';
+                        systemMessagesList.appendChild(messageItem);
+                    }
+                });
+            }
+            
+            // Expose the speakText function to the global scope
+            window.speakText = speakText;
+        });
+        
+        // Set up microphone button for easy voice input
+        document.addEventListener('DOMContentLoaded', () => {
+            const micBtn = document.getElementById('micBtn');
+            const messageInput = document.getElementById('messageInput');
+            let mediaRecorder = null;
+            let audioChunks = [];
+            let isRecording = false;
+            
+            // Check if the browser supports speech recognition
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            
+            if (SpeechRecognition) {
+                const recognition = new SpeechRecognition();
+                recognition.continuous = true;
+                recognition.interimResults = true;
+                
+                // Configure recognition
+                recognition.lang = 'en-US';
+                
+                // Track transcript state
+                let finalTranscript = '';
+                let interimTranscript = '';
+                
+                // Handle recognition results
+                recognition.onresult = (event) => {
+                    interimTranscript = '';
+                    
+                    // Process all the results
+                    for (let i = event.resultIndex; i < event.results.length; i++) {
+                        const transcript = event.results[i][0].transcript;
+                        
+                        if (event.results[i].isFinal) {
+                            finalTranscript += transcript + ' ';
+                        } else {
+                            interimTranscript += transcript;
+                        }
+                    }
+                    
+                    // Clean up excess spaces
+                    finalTranscript = finalTranscript.trim();
+                    
+                    // Combine final and interim results for display
+                    const fullTranscript = finalTranscript + (interimTranscript ? ' ' + interimTranscript : '');
+                    
+                    // Update the input field
+                    messageInput.value = fullTranscript;
+                    
+                    // Visual feedback on updates
+                    if (isRecording) {
+                        // Subtle visual feedback during recording
+                        micBtn.classList.add('pulse-animation');
+                    }
+                };
+                
+                // Handle recognition end (successful completion)
+                recognition.onend = () => {
+                    if (isRecording) {
+                        // If we're still in recording state, this was an auto-timeout
+                        // Show temporary green success indicator
+                        micBtn.classList.remove('bg-red-500');
+                        micBtn.classList.add('bg-green-500');
+                        
+                        setTimeout(() => {
+                            if (!isRecording) {
+                                micBtn.classList.remove('bg-green-500');
+                                micBtn.classList.add('bg-gray-300');
+                                micBtn.classList.add('text-gray-600');
+                            }
+                        }, 1000);
+                        
+                        // Update recording state
+                        isRecording = false;
+                        
+                        // Reset the placeholder
+                        messageInput.placeholder = 'Type your message...';
+                        
+                        // Focus the input field
+                        setTimeout(() => {
+                            messageInput.focus();
+                        }, 100);
+                    }
+                    
+                    // Remove any pulse animation
+                    micBtn.classList.remove('pulse-animation');
+                };
+                
+                // Handle errors
+                recognition.onerror = (event) => {
+                    console.error('Speech recognition error:', event.error);
+                    // Show error in system messages
+                    const systemMessagesList = document.getElementById('systemMessageList');
+                    const messageItem = document.createElement('div');
+                    messageItem.className = 'text-sm text-red-600 mb-1';
+                    messageItem.textContent = `Microphone error: ${event.error}`;
+                    systemMessagesList.appendChild(messageItem);
+                    
+                    // Reset button state
+                    isRecording = false;
+                    micBtn.classList.remove('bg-red-500');
+                    micBtn.classList.remove('pulse-animation');
+                    micBtn.classList.add('bg-gray-300');
+                    micBtn.classList.add('text-gray-600');
+                    
+                    // Reset the placeholder
+                    messageInput.placeholder = 'Type your message...';
+                };
+                
+                // Function to start recording
+                function startRecording(recognition) {
+                    // Reset transcript tracking
+                    finalTranscript = '';
+                    interimTranscript = '';
+                    
+                    isRecording = true;
+                    
+                    // Update button appearance
+                    micBtn.classList.remove('bg-gray-300');
+                    micBtn.classList.remove('text-gray-600');
+                    micBtn.classList.add('bg-red-500');
+                    micBtn.classList.add('text-white');
+                    micBtn.classList.add('pulse-animation');
+                    
+                    // Clear input field
+                    messageInput.value = '';
+                    messageInput.placeholder = 'Listening...';
+                    
+                    // Start recognition
+                    try {
+                        // Make sure to stop any existing recognition first to clear state
+                        try {
+                            recognition.abort();
+                        } catch (e) {
+                            // Ignore errors from aborting
+                        }
+                        
+                        recognition.start();
+                        console.log('Speech recognition started');
+                        
+                        // Add system message
+                        const systemMessagesList = document.getElementById('systemMessageList');
+                        const messageItem = document.createElement('div');
+                        messageItem.className = 'text-sm text-blue-600 mb-1';
+                        messageItem.textContent = 'Listening...';
+                        systemMessagesList.appendChild(messageItem);
+                    } catch (error) {
+                        console.error('Error starting speech recognition:', error);
+                    }
+                }
+                
+                // Function to stop recording
+                function stopRecording(recognition) {
+                    if (!isRecording) return;
+                    
+                    isRecording = false;
+                    
+                    // Stop recognition
+                    try {
+                        recognition.stop();
+                        console.log('Speech recognition stopped');
+                        
+                        // Update button appearance
+                        micBtn.classList.remove('bg-red-500');
+                        micBtn.classList.remove('text-white');
+                        micBtn.classList.remove('pulse-animation');
+                        micBtn.classList.add('bg-gray-300');
+                        micBtn.classList.add('text-gray-600');
+                        
+                        // Reset placeholder
+                        messageInput.placeholder = 'Type your message...';
+                        
+                        // Focus on the input field so the user can immediately press Enter to send
+                        setTimeout(() => {
+                            messageInput.focus();
+                        }, 100);
+                        
+                        // Add system message
+                        const systemMessagesList = document.getElementById('systemMessageList');
+                        const messageItem = document.createElement('div');
+                        messageItem.className = 'text-sm text-gray-600 mb-1';
+                        messageItem.textContent = 'Stopped listening';
+                        systemMessagesList.appendChild(messageItem);
+                    } catch (error) {
+                        console.error('Error stopping speech recognition:', error);
+                    }
+                }
+                
+                // Handle the microphone button (hold to speak)
+                if (micBtn) {
+                    // Mouse events for desktop
+                    micBtn.addEventListener('mousedown', () => {
+                        startRecording(recognition);
+                    });
+                    
+                    micBtn.addEventListener('mouseup', () => {
+                        stopRecording(recognition);
+                    });
+                    
+                    micBtn.addEventListener('mouseleave', () => {
+                        if (isRecording) {
+                            stopRecording(recognition);
+                        }
+                    });
+                    
+                    // Touch events for mobile
+                    micBtn.addEventListener('touchstart', (e) => {
+                        e.preventDefault(); // Prevent default touch behavior
+                        e.stopPropagation(); // Prevent propagation
+                        startRecording(recognition);
+                    });
+                    
+                    micBtn.addEventListener('touchend', (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        stopRecording(recognition);
+                    });
+                    
+                    // Handle touch cancel as well (important for mobile)
+                    micBtn.addEventListener('touchcancel', (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (isRecording) {
+                            stopRecording(recognition);
+                        }
+                    });
+                    
+                    // Add feedback for mobile
+                    micBtn.addEventListener('touchstart', () => {
+                        // Add active state for mobile
+                        micBtn.style.transform = 'scale(0.95)';
+                    });
+                    
+                    micBtn.addEventListener('touchend', () => {
+                        // Remove active state
+                        micBtn.style.transform = 'scale(1)';
+                    });
+                }
+            } else {
+                // Web Speech API not supported
+                micBtn.style.display = 'none';
+                
+                // Add system message
+                const systemMessagesList = document.getElementById('systemMessageList');
+                const messageItem = document.createElement('div');
+                messageItem.className = 'text-sm text-red-600 mb-1';
+                messageItem.textContent = 'Speech recognition is not supported in this browser.';
+                systemMessagesList.appendChild(messageItem);
             }
         });
     </script>

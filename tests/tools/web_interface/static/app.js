@@ -4,6 +4,12 @@ class AssistantBridgeUI {
         this.connected = false;
         this.currentResponseTurn = null;
         this.systemMessageCount = 0;
+        this.currentAssistantMessage = '';
+        this.isAccumulatingMessage = false;
+        this.speakTimeout = null;
+        this.fullResponse = '';
+        this.responseComplete = false;
+        
         this.setupEventListeners();
         this.connect();
     }
@@ -80,14 +86,97 @@ class AssistantBridgeUI {
                     this.currentResponseTurn.className = 'mb-2 text-left bg-gray-100 text-gray-800 rounded-lg p-2 mr-auto max-w-[80%]';
                     this.currentResponseTurn.textContent = '';
                     document.getElementById('chatMessages').appendChild(this.currentResponseTurn);
+                    
+                    // Reset for a new message
+                    this.currentAssistantMessage = '';
+                    this.isAccumulatingMessage = true;
+                    this.fullResponse = '';
+                    this.responseComplete = false;
+                    
+                    // Clear any pending speech timeout
+                    if (this.speakTimeout) {
+                        clearTimeout(this.speakTimeout);
+                        this.speakTimeout = null;
+                    }
+                    
+                    // Cancel any ongoing speech when starting a new response
+                    if (window.speechSynthesis) {
+                        window.speechSynthesis.cancel();
+                    }
                 }
                 
                 // Append this chunk to the current turn
+                console.log("Appending content to bubble:", data.content);
                 this.currentResponseTurn.textContent += data.content;
+                
+                // Add to the full response
+                this.fullResponse += data.content;
+                
+                this.scrollToBottom();
+            }
+        } else if (data.type === 'content_chunk') {
+            // Handle direct content chunks
+            if (!this.currentResponseTurn) {
+                console.log("Creating new bubble for content chunk");
+                this.currentResponseTurn = document.createElement('div');
+                this.currentResponseTurn.className = 'mb-2 text-left bg-gray-100 text-gray-800 rounded-lg p-2 mr-auto max-w-[80%]';
+                this.currentResponseTurn.textContent = '';
+                document.getElementById('chatMessages').appendChild(this.currentResponseTurn);
+                
+                // Reset for a new message
+                this.currentAssistantMessage = '';
+                this.isAccumulatingMessage = true;
+                this.fullResponse = '';
+                this.responseComplete = false;
+            }
+            
+            // Get the content from the data
+            const content = data.data && data.data.content ? data.data.content : '';
+            if (content) {
+                console.log("Appending content chunk to bubble:", content);
+                this.currentResponseTurn.textContent += content;
+                
+                // Add to the full response
+                this.fullResponse += content;
+                
                 this.scrollToBottom();
             }
         } else if (data.type === 'error') {
             this.addSystemMessage(`Error: ${data.error}`);
+        } else if (data.type === 'completion') {
+            // Mark the response as complete
+            this.responseComplete = true;
+            
+            // Clear any pending timeout
+            if (this.speakTimeout) {
+                clearTimeout(this.speakTimeout);
+                this.speakTimeout = null;
+            }
+            
+            // Speak the entire response at once
+            if (window.speakText && this.fullResponse) {
+                console.log("Speaking complete response:", this.fullResponse);
+                setTimeout(() => {
+                    // Cancel any previous speech
+                    if (window.speechSynthesis) {
+                        window.speechSynthesis.cancel();
+                    }
+                    window.speakText(this.fullResponse);
+                    
+                    // Add system message
+                    const systemMessagesList = document.getElementById('systemMessageList');
+                    const messageItem = document.createElement('div');
+                    messageItem.className = 'text-sm text-green-600 mb-1';
+                    messageItem.textContent = `Speaking complete response (${this.fullResponse.length} chars)...`;
+                    systemMessagesList.appendChild(messageItem);
+                }, 200);
+            }
+            
+            this.isAccumulatingMessage = false;
+            
+            console.log('Message complete:', data.data);
+        } else {
+            console.log('Unhandled message type:', data.type);
         }
     }
 
@@ -121,8 +210,16 @@ class AssistantBridgeUI {
         userBubble.textContent = message;
         document.getElementById('chatMessages').appendChild(userBubble);
 
-        // We don't reset currentResponseTurn here anymore - 
-        // we'll let the server tell us when to create a new bubble
+        // Reset for new assistant response
+        this.currentAssistantMessage = '';
+        this.isAccumulatingMessage = false;
+        this.fullResponse = '';
+        this.responseComplete = false;
+        
+        // Cancel any ongoing speech when sending a new message
+        if (window.speechSynthesis) {
+            window.speechSynthesis.cancel();
+        }
 
         // Send to server
         this.ws.send(JSON.stringify({
