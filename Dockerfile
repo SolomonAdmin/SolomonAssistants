@@ -1,5 +1,5 @@
-# Use an official Python runtime as a base image
-FROM python:3.9-slim-bullseye
+# Use an official Python runtime as a base image with explicit platform specification
+FROM --platform=linux/amd64 python:3.9-slim-bullseye
 
 # Set the working directory in the container
 WORKDIR /app
@@ -14,7 +14,7 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# Install Microsoft ODBC driver (updated to version 18 and Debian 11)
+# Install Microsoft ODBC driver
 RUN curl https://packages.microsoft.com/keys/microsoft.asc | apt-key add - && \
     curl https://packages.microsoft.com/config/debian/11/prod.list > /etc/apt/sources.list.d/mssql-release.list && \
     apt-get update && \
@@ -48,4 +48,3 @@ ENV PYTHONPATH="/app:/app/app"
 
 # Run the application
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "80"]
-# CMD ["bash", "-c", "while true; do sleep 1000; done"]
