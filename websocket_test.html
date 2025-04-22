@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebSocket Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .container {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        .button-group {
+            display: flex;
+            gap: 10px;
+        }
+        button {
+            padding: 8px 15px;
+            cursor: pointer;
+        }
+        input, select {
+            padding: 8px;
+            width: 100%;
+        }
+        pre {
+            background-color: #f4f4f4;
+            padding: 15px;
+            border-radius: 5px;
+            height: 300px;
+            overflow: auto;
+            margin-top: 20px;
+        }
+        .status {
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .connected {
+            color: green;
+        }
+        .disconnected {
+            color: red;
+        }
+        .message {
+            margin: 5px 0;
+            padding: 5px;
+            border-bottom: 1px solid #eee;
+        }
+        .sent {
+            color: #0066cc;
+        }
+        .received {
+            color: #009900;
+        }
+        .error {
+            color: #cc0000;
+        }
+    </style>
+</head>
+<body>
+    <h1>WebSocket Test Client</h1>
+    <div class="status disconnected" id="connectionStatus">Disconnected</div>
+    
+    <div class="container">
+        <div class="input-group">
+            <label for="serverUrl">WebSocket URL:</label>
+            <input type="text" id="serverUrl" value="ws://localhost:8080/ws/assistant/">
+        </div>
+        
+        <div class="input-group">
+            <label for="assistantId">Assistant ID:</label>
+            <input type="text" id="assistantId" value="test-assistant-123">
+        </div>
+        
+        <div class="button-group">
+            <button onclick="connectWebSocket()">Connect</button>
+            <button onclick="disconnectWebSocket()">Disconnect</button>
+        </div>
+        
+        <div class="input-group">
+            <label for="apiKey">API Key:</label>
+            <input type="text" id="apiKey" value="">
+            <button onclick="initialize()">Initialize Assistant</button>
+        </div>
+        
+        <div class="input-group">
+            <label for="message">Message:</label>
+            <input type="text" id="message" value="Hello, how can you help me today?">
+            <button onclick="sendMessage()">Send Message</button>
+        </div>
+        
+        <button onclick="clearHistory()">Clear Conversation History</button>
+        
+        <div class="input-group">
+            <button onclick="clearLog()">Clear Log</button>
+        </div>
+        
+        <h3>Message Log:</h3>
+        <pre id="messageLog"></pre>
+    </div>
+
+    <script>
+        let socket = null;
+        
+        function connectWebSocket() {
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                appendLog("Already connected", "error");
+                return;
+            }
+            
+            const baseUrl = document.getElementById('serverUrl').value.trim();
+            const assistantId = document.getElementById('assistantId').value.trim();
+            const url = baseUrl + assistantId;
+            
+            try {
+                socket = new WebSocket(url);
+                
+                socket.onopen = function(e) {
+                    document.getElementById('connectionStatus').className = "status connected";
+                    document.getElementById('connectionStatus').textContent = "Connected";
+                    appendLog("Connection established", "received");
+                };
+                
+                socket.onmessage = function(event) {
+                    try {
+                        const data = JSON.parse(event.data);
+                        appendLog(`Received: ${JSON.stringify(data, null, 2)}`, "received");
+                    } catch (e) {
+                        appendLog(`Received: ${event.data}`, "received");
+                    }
+                };
+                
+                socket.onclose = function(event) {
+                    document.getElementById('connectionStatus').className = "status disconnected";
+                    document.getElementById('connectionStatus').textContent = "Disconnected";
+                    
+                    if (event.wasClean) {
+                        appendLog(`Connection closed cleanly, code=${event.code} reason=${event.reason}`, "received");
+                    } else {
+                        appendLog('Connection died unexpectedly', "error");
+                    }
+                };
+                
+                socket.onerror = function(error) {
+                    appendLog(`WebSocket Error: ${error.message || "Unknown error"}`, "error");
+                };
+                
+            } catch (error) {
+                appendLog(`Failed to connect: ${error.message}`, "error");
+            }
+        }
+        
+        function disconnectWebSocket() {
+            if (!socket) {
+                appendLog("Not connected", "error");
+                return;
+            }
+            
+            socket.close();
+            socket = null;
+        }
+        
+        function initialize() {
+            if (!socket || socket.readyState !== WebSocket.OPEN) {
+                appendLog("Not connected to WebSocket", "error");
+                return;
+            }
+            
+            const apiKey = document.getElementById('apiKey').value.trim();
+            if (!apiKey) {
+                appendLog("API Key is required", "error");
+                return;
+            }
+            
+            const data = {
+                type: "initialize",
+                api_key: apiKey,
+                vector_store_ids: []
+            };
+            
+            sendData(data);
+        }
+        
+        function sendMessage() {
+            if (!socket || socket.readyState !== WebSocket.OPEN) {
+                appendLog("Not connected to WebSocket", "error");
+                return;
+            }
+            
+            const message = document.getElementById('message').value;
+            if (!message) {
+                appendLog("Message is empty", "error");
+                return;
+            }
+            
+            const data = {
+                type: "chat_message",
+                message: message
+            };
+            
+            sendData(data);
+        }
+        
+        function clearHistory() {
+            if (!socket || socket.readyState !== WebSocket.OPEN) {
+                appendLog("Not connected to WebSocket", "error");
+                return;
+            }
+            
+            const data = {
+                type: "clear_history"
+            };
+            
+            sendData(data);
+        }
+        
+        function sendData(data) {
+            try {
+                const jsonStr = JSON.stringify(data);
+                socket.send(jsonStr);
+                appendLog(`Sent: ${JSON.stringify(data, null, 2)}`, "sent");
+            } catch (error) {
+                appendLog(`Error sending data: ${error.message}`, "error");
+            }
+        }
+        
+        function appendLog(message, type = "info") {
+            const log = document.getElementById('messageLog');
+            const entry = document.createElement('div');
+            entry.className = `message ${type}`;
+            
+            // Format the timestamp
+            const now = new Date();
+            const timestamp = `[${now.toLocaleTimeString()}]`;
+            
+            entry.textContent = `${timestamp} ${message}`;
+            log.appendChild(entry);
+            log.scrollTop = log.scrollHeight;
+        }
+        
+        function clearLog() {
+            document.getElementById('messageLog').innerHTML = '';
+        }
+    </script>
+</body>
+</html>
