@@ -11,7 +11,7 @@ import os
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-async def test_websocket_client(api_key, assistant_id, vector_store_ids=None):
+async def test_websocket_client(solomon_consumer_key, assistant_id, vector_store_ids=None):
     """Test the WebSocket API with streaming responses."""
     uri = "ws://localhost:8000/ws"
     print(f"Connecting to {uri}...")
@@ -19,7 +19,7 @@ async def test_websocket_client(api_key, assistant_id, vector_store_ids=None):
     async with websockets.connect(uri) as websocket:
         # Send connection parameters
         await websocket.send(json.dumps({
-            "api_key": api_key,
+            "solomon_consumer_key": solomon_consumer_key,
             "assistant_id": assistant_id,
             "vector_store_ids": vector_store_ids
         }))
@@ -93,18 +93,18 @@ async def test_websocket_client(api_key, assistant_id, vector_store_ids=None):
 
 def main():
     parser = argparse.ArgumentParser(description="Test the WebSocket API")
-    parser.add_argument("api_key", help="OpenAI API key")
+    parser.add_argument("solomon_consumer_key", help="Solomon Consumer Key")
     parser.add_argument("assistant_id", help="OpenAI Assistant ID")
     parser.add_argument("--vector-stores", nargs="+", help="Vector store IDs for file search")
-    
+
     args = parser.parse_args()
-    
+
     try:
-        asyncio.run(test_websocket_client(args.api_key, args.assistant_id, args.vector_stores))
+        asyncio.run(test_websocket_client(args.solomon_consumer_key, args.assistant_id, args.vector_stores))
     except KeyboardInterrupt:
         print("\nTest terminated by user")
     except Exception as e:
         print(f"Error: {str(e)}")
 
 if __name__ == "__main__":
-    main() 
+    main()
