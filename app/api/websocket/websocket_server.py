@@ -11,6 +11,7 @@ from pydantic import BaseModel
 # Import the AssistantBridge instead of DirectAssistantBridge
 from app.services.assistant_bridge import AssistantBridge
 from app.services.workato_integration import WorkatoConfig
+from services.service_db import DBService
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -50,23 +51,33 @@ async def websocket_endpoint(websocket: WebSocket):
         params = json.loads(params_json)
         
         # Validate required parameters
-        if not params.get("api_key") or not params.get("assistant_id"):
+        if not params.get("solomon_consumer_key") or not params.get("assistant_id"):
             await websocket.send_json({
                 "type": "error",
-                "error": "Missing required parameters: api_key and assistant_id are required"
+                "error": "Missing required parameters: solomon_consumer_key and assistant_id are required"
             })
             await websocket.close()
             return
         
         # Initialize the assistant bridge
         logger.info(f"Initializing AssistantBridge for connection {connection_id}")
-        api_key = params.get("api_key")
+        solomon_consumer_key = params.get("solomon_consumer_key")
         assistant_id = params.get("assistant_id")
         vector_store_ids = params.get("vector_store_ids")
+
+        # Retrieve OpenAI API key using DBService
+        openai_api_key = await DBService.get_openai_api_key(solomon_consumer_key)
+        if not openai_api_key:
+            await websocket.send_json({
+                "type": "error",
+                "error": "Invalid Solomon Consumer Key"
+            })
+            await websocket.close()
+            return
         
         try:
             bridge = AssistantBridge(
-                api_key=api_key,
+                api_key=openai_api_key,
                 assistant_id=assistant_id,
                 vector_store_ids=vector_store_ids
             )
