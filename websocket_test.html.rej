@@ -1,0 +1,119 @@
+diff a/websocket_test.html b/websocket_test.html	(rejected hunks)
+@@ -64,52 +64,52 @@
+             color: #cc0000;
+         }
+     </style>
+ </head>
+ <body>
+     <h1>WebSocket Test Client</h1>
+     <div class="status disconnected" id="connectionStatus">Disconnected</div>
+     
+     <div class="container">
+         <div class="input-group">
+             <label for="serverUrl">WebSocket URL:</label>
+             <input type="text" id="serverUrl" value="ws://localhost:8080/ws/assistant/">
+         </div>
+         
+         <div class="input-group">
+             <label for="assistantId">Assistant ID:</label>
+             <input type="text" id="assistantId" value="test-assistant-123">
+         </div>
+         
+         <div class="button-group">
+             <button onclick="connectWebSocket()">Connect</button>
+             <button onclick="disconnectWebSocket()">Disconnect</button>
+         </div>
+         
+         <div class="input-group">
+-            <label for="apiKey">API Key:</label>
+-            <input type="text" id="apiKey" value="">
++            <label for="solomonConsumerKey">Solomon Consumer Key:</label>
++            <input type="text" id="solomonConsumerKey" value="">
+             <button onclick="initialize()">Initialize Assistant</button>
+         </div>
+         
+         <div class="input-group">
+             <label for="message">Message:</label>
+             <input type="text" id="message" value="Hello, how can you help me today?">
+             <button onclick="sendMessage()">Send Message</button>
+         </div>
+         
+         <button onclick="clearHistory()">Clear Conversation History</button>
+         
+         <div class="input-group">
+             <button onclick="clearLog()">Clear Log</button>
+         </div>
+         
+         <h3>Message Log:</h3>
+         <pre id="messageLog"></pre>
+     </div>
+ 
+     <script>
+         let socket = null;
+         
+         function connectWebSocket() {
+             if (socket && socket.readyState === WebSocket.OPEN) {
+                 appendLog("Already connected", "error");
+@@ -152,59 +152,59 @@
+                 socket.onerror = function(error) {
+                     appendLog(`WebSocket Error: ${error.message || "Unknown error"}`, "error");
+                 };
+                 
+             } catch (error) {
+                 appendLog(`Failed to connect: ${error.message}`, "error");
+             }
+         }
+         
+         function disconnectWebSocket() {
+             if (!socket) {
+                 appendLog("Not connected", "error");
+                 return;
+             }
+             
+             socket.close();
+             socket = null;
+         }
+         
+         function initialize() {
+             if (!socket || socket.readyState !== WebSocket.OPEN) {
+                 appendLog("Not connected to WebSocket", "error");
+                 return;
+             }
+             
+-            const apiKey = document.getElementById('apiKey').value.trim();
++            const apiKey = document.getElementById('solomonConsumerKey').value.trim();
+             if (!apiKey) {
+-                appendLog("API Key is required", "error");
++                appendLog("Solomon Consumer Key is required", "error");
+                 return;
+             }
+             
+             const data = {
+                 type: "initialize",
+-                api_key: apiKey,
++                solomon_consumer_key: apiKey,
+                 vector_store_ids: []
+             };
+             
+             sendData(data);
+         }
+         
+         function sendMessage() {
+             if (!socket || socket.readyState !== WebSocket.OPEN) {
+                 appendLog("Not connected to WebSocket", "error");
+                 return;
+             }
+             
+             const message = document.getElementById('message').value;
+             if (!message) {
+                 appendLog("Message is empty", "error");
+                 return;
+             }
+             
+             const data = {
+                 type: "chat_message",
+                 message: message
+             };
+             
+             sendData(data);
+         }

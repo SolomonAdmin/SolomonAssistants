@@ -13,6 +13,7 @@ from fastapi.responses import Response
 import yaml
 import functools
 import logging
+from services.service_db import DBService
 
 # Add the parent directory to sys.path to make 'tools' module discoverable
 sys.path.append(str(Path(__file__).parent.parent))
@@ -89,20 +90,29 @@ async def websocket_endpoint(websocket: WebSocket, assistant_id: str):
             
             # Handle different message types
             if data.get("type") == "initialize":
-                # Initialize the assistant bridge
-                api_key = data.get("api_key")
+                # Initialize the assistant bridge using Solomon Consumer Key
+                solomon_consumer_key = data.get("solomon_consumer_key")
                 vector_store_ids = data.get("vector_store_ids", [])
-                
-                if not api_key:
+
+                if not solomon_consumer_key:
                     await manager.send_json({
                         "type": "error",
-                        "data": {"message": "API key is required for initialization"}
+                        "data": {"message": "Solomon Consumer Key is required for initialization"}
                     }, websocket)
                     continue
-                
+
+                # Fetch the OpenAI API key from the database
+                openai_api_key = await DBService.get_openai_api_key(solomon_consumer_key)
+                if not openai_api_key:
+                    await manager.send_json({
+                        "type": "error",
+                        "data": {"message": "Invalid Solomon Consumer Key"}
+                    }, websocket)
+                    continue
+
                 try:
                     bridge = AssistantBridge(
-                        api_key=api_key,
+                        api_key=openai_api_key,
                         assistant_id=assistant_id,
                         vector_store_ids=vector_store_ids
                     )

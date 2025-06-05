@@ -1,0 +1,141 @@
+diff a/app/api/websocket_server.py b/app/api/websocket_server.py	(rejected hunks)
+@@ -1,119 +1,128 @@
+ # Remove any imports like:
+ # from app.services.agent_services.direct_bridge import DirectAssistantBridge
+ # Remove any code that uses the DirectAssistantBridge class 
+ 
+ # Replace any code that might be choosing between bridges:
+ # bridge = DirectAssistantBridge(...) if use_direct_api else AssistantBridge(...)
+ # With:
+ bridge = AssistantBridge(...) 
+ 
+ import asyncio
+ import json
+ import logging
+ import uuid
+ from typing import Dict, List, Optional, Any
+ 
+ from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends, HTTPException, Header
+ from fastapi.middleware.cors import CORSMiddleware
+ from pydantic import BaseModel
+ 
+ # Import your existing services
+ from app.services.assistant_bridge import AssistantBridge
+ from app.services.workato_integration import WorkatoConfig
++from services.service_db import DBService
+ 
+ # Set up logging
+ logging.basicConfig(level=logging.INFO)
+ logger = logging.getLogger(__name__)
+ 
+ # Standard Workato configuration (you might want to load this from environment variables)
+ WORKATO_CONFIG = WorkatoConfig(
+     api_token="ad19767e318455a1daa7635b3e5f3ce4055f11376155b45c506ceb4f4f739d1c",
+     endpoint_url="https://apim.workato.com/solconsult/assistant-tools-v1/workato-root-tool"
+ )
+ 
+ # Create FastAPI app
+ app = FastAPI(title="OpenAI Agents WebSocket API")
+ 
+ # Add CORS middleware
+ app.add_middleware(
+     CORSMiddleware,
+     allow_origins=["*"],  # For production, specify actual origins
+     allow_credentials=True,
+     allow_methods=["*"],
+     allow_headers=["*"],
+ )
+ 
+ # Models for connection parameters
+ class ConnectionParams(BaseModel):
+-    api_key: str
+-    assistant_id: str
++    solomon_consumer_key: str
+     vector_store_ids: Optional[List[str]] = None
+     thread_id: Optional[str] = None  # Add thread_id to support conversation persistence
+ 
+ # Store active connections and their associated thread IDs
+ active_connections: Dict[str, AssistantBridge] = {}
+ thread_connections: Dict[str, str] = {}  # Maps thread_ids to connection_ids
+ 
+ # Authentication dependency
+ async def get_api_key(x_api_key: str = Header(None)):
+     if not x_api_key:
+         raise HTTPException(status_code=401, detail="API key is required")
+     # In production, you would validate the API key against your database
+     return x_api_key
+ 
+-@app.websocket("/ws")
+-async def websocket_endpoint(websocket: WebSocket):
++@app.websocket("/ws/assistant/{assistant_id}")
++async def websocket_endpoint(websocket: WebSocket, assistant_id: str):
+     """WebSocket endpoint for real-time chat with the assistant."""
+     await websocket.accept()
+     connection_id = str(uuid.uuid4())
+     
+     try:
+         # Wait for connection parameters
+         logger.info(f"New connection {connection_id} established, waiting for parameters")
+         params_json = await websocket.receive_text()
+         params = json.loads(params_json)
+-        
++
+         # Validate required parameters
+-        if not params.get("api_key") or not params.get("assistant_id"):
++        if not params.get("solomon_consumer_key"):
+             await websocket.send_json({
+                 "type": "error",
+-                "error": "Missing required parameters: api_key and assistant_id are required"
++                "error": "Missing required parameters: solomon_consumer_key is required"
+             })
+             await websocket.close()
+             return
+         
+         # Initialize the assistant bridge
+         logger.info(f"Initializing AssistantBridge for connection {connection_id}")
+-        api_key = params.get("api_key")
+-        assistant_id = params.get("assistant_id")
++        solomon_consumer_key = params.get("solomon_consumer_key")
+         vector_store_ids = params.get("vector_store_ids")
++
++        # Retrieve OpenAI API key using DBService
++        openai_api_key = await DBService.get_openai_api_key(solomon_consumer_key)
++        if not openai_api_key:
++            await websocket.send_json({
++                "type": "error",
++                "error": "Invalid Solomon Consumer Key"
++            })
++            await websocket.close()
++            return
+         thread_id = params.get("thread_id")  # Get thread_id if provided
+-        
++
+         try:
+             bridge = AssistantBridge(
+-                api_key=api_key,
++                api_key=openai_api_key,
+                 assistant_id=assistant_id,
+                 vector_store_ids=vector_store_ids
+             )
+             await bridge.initialize(workato_config=WORKATO_CONFIG)
+             
+             # If thread_id is provided, restore the conversation state
+             if thread_id:
+                 bridge.session_memory.set_thread_id(thread_id)
+                 # Load any existing conversation history for this thread
+                 # (assuming you have implemented this in your storage layer)
+             else:
+                 # Generate new thread_id for new conversations
+                 thread_id = str(uuid.uuid4())
+                 bridge.session_memory.set_thread_id(thread_id)
+             
+             # Store the bridge instance and thread mapping
+             active_connections[connection_id] = bridge
+             thread_connections[thread_id] = connection_id
+             
+             # Notify client that the assistant is ready
+             await websocket.send_json({
+                 "type": "ready",
+                 "message": "Assistant initialized successfully",
+                 "thread_id": thread_id
+             })

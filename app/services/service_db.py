@@ -32,7 +32,7 @@ class DBService:
         db_connector = DatabaseConnector()
         try:
             query = """
-                SELECT TOP 1 
+                SELECT TOP 1
                     solomon_consumer_key,
                     customer_name,
                     aws_key,
@@ -41,11 +41,10 @@ class DBService:
                     plan_level,
                     customer_email,
                     openai_api_key
-                FROM dbo.solConnectConsumers 
+                FROM dbo.solConnectConsumers
                 WHERE solomon_consumer_key = :solomon_consumer_key
             """
             result = db_connector.execute_query(query, {"solomon_consumer_key": solomon_consumer_key})
-            print(result[0][7])
             if result and result[0]:
                 return {
                     "solomon_consumer_key": result[0][0],
@@ -70,7 +69,7 @@ class DBService:
         try:
             query = """
                 SELECT workspace_name
-                FROM dbo.solConnectUsers 
+                FROM dbo.solConnectUsers
                 WHERE customer_email = :email
             """
             result = db_connector.execute_query(query, {"email": email})

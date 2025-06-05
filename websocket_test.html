@@ -231,21 +231,21 @@
                 appendLog(`Error sending data: ${error.message}`, "error");
             }
         }
-        
+
         function appendLog(message, type = "info") {
             const log = document.getElementById('messageLog');
             const entry = document.createElement('div');
             entry.className = `message ${type}`;
-            
+
             // Format the timestamp
             const now = new Date();
             const timestamp = `[${now.toLocaleTimeString()}]`;
-            
+
             entry.textContent = `${timestamp} ${message}`;
             log.appendChild(entry);
             log.scrollTop = log.scrollHeight;
         }
-        
+
         function clearLog() {
             document.getElementById('messageLog').innerHTML = '';
         }

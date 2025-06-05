@@ -1,0 +1,993 @@
+diff --git a/README.md b/README.md
+index a42bdfff7f217cb307c24a36b122a93fc8936db3..41fee0d6e04948bd5bebaaebc3fb178d42ee112c 100644
+--- a/README.md
++++ b/README.md
+@@ -1,2 +1,39 @@
+ # Solomon-OpenAI-FastAPI
+-FastAPI connections to OpenAI assistants. 
++
++FastAPI connections to OpenAI assistants.
++
++## Setup
++
++1. Create and activate a virtual environment:
++
++```bash
++python -m venv .venv
++source .venv/bin/activate
++```
++
++2. Install dependencies:
++
++```bash
++pip install -r requirements-minimal.txt
++```
++
++3. Set the `PYTHONPATH` so the `app` package can be imported:
++
++```bash
++export PYTHONPATH=$PYTHONPATH:$(pwd)/app
++```
++
++## Running Tests
++
++Install any additional test dependencies listed in `requirements.txt` if needed and run:
++
++```bash
++pytest -q
++```
++
++The tests include an example WebSocket client that connects to the running server.
++
++## WebSocket Authentication
++
++Send a JSON message containing your `solomon_consumer_key` immediately after connecting to `/ws/assistant/<assistant_id>`.
++
+diff --git a/app/api/websocket/websocket_server.py b/app/api/websocket/websocket_server.py
+index 88fdf6b13acd92620d50ef48d2bf76095b0aa102..4fb357fc2fb852c85b5e3de0e2bcd1af11d2bbe8 100644
+--- a/app/api/websocket/websocket_server.py
++++ b/app/api/websocket/websocket_server.py
+@@ -1,94 +1,104 @@
+ import asyncio
+ import json
+ import logging
+ import uuid
+ from typing import Dict, List, Optional, Any
+ 
+ from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends, HTTPException, Header
+ from fastapi.middleware.cors import CORSMiddleware
+ from pydantic import BaseModel
+ 
+ # Import the AssistantBridge instead of DirectAssistantBridge
+ from app.services.assistant_bridge import AssistantBridge
+ from app.services.workato_integration import WorkatoConfig
++from services.service_db import DBService
+ 
+ # Set up logging
+ logging.basicConfig(level=logging.INFO)
+ logger = logging.getLogger(__name__)
+ 
+ # Standard Workato configuration (you might want to load this from environment variables)
+ WORKATO_CONFIG = WorkatoConfig(
+     api_token="ad19767e318455a1daa7635b3e5f3ce4055f11376155b45c506ceb4f4f739d1c",
+     endpoint_url="https://apim.workato.com/solconsult/assistant-tools-v1/workato-root-tool"
+ )
+ 
+ # Create FastAPI app
+ app = FastAPI(title="OpenAI Agents WebSocket API")
+ 
+ # Add CORS middleware
+ app.add_middleware(
+     CORSMiddleware,
+     allow_origins=["*"],  # For production, specify actual origins
+     allow_credentials=True,
+     allow_methods=["*"],
+     allow_headers=["*"],
+ )
+ 
+ # Store active connections
+ active_connections: Dict[str, AssistantBridge] = {}
+ 
+-@app.websocket("/ws")
+-async def websocket_endpoint(websocket: WebSocket):
++@app.websocket("/ws/assistant/{assistant_id}")
++async def websocket_endpoint(websocket: WebSocket, assistant_id: str):
+     """WebSocket endpoint for real-time chat with the assistant."""
+     await websocket.accept()
+     connection_id = str(uuid.uuid4())
+     
+     try:
+         # Wait for connection parameters
+         logger.info(f"New connection {connection_id} established, waiting for parameters")
+         params_json = await websocket.receive_text()
+         params = json.loads(params_json)
+-        
++
+         # Validate required parameters
+-        if not params.get("api_key") or not params.get("assistant_id"):
++        if not params.get("solomon_consumer_key"):
+             await websocket.send_json({
+                 "type": "error",
+-                "error": "Missing required parameters: api_key and assistant_id are required"
++                "error": "Missing required parameters: solomon_consumer_key is required"
+             })
+             await websocket.close()
+             return
+         
+         # Initialize the assistant bridge
+         logger.info(f"Initializing AssistantBridge for connection {connection_id}")
+-        api_key = params.get("api_key")
+-        assistant_id = params.get("assistant_id")
++        solomon_consumer_key = params.get("solomon_consumer_key")
+         vector_store_ids = params.get("vector_store_ids")
++
++        # Retrieve OpenAI API key using DBService
++        openai_api_key = await DBService.get_openai_api_key(solomon_consumer_key)
++        if not openai_api_key:
++            await websocket.send_json({
++                "type": "error",
++                "error": "Invalid Solomon Consumer Key"
++            })
++            await websocket.close()
++            return
+         
+         try:
+             bridge = AssistantBridge(
+-                api_key=api_key,
++                api_key=openai_api_key,
+                 assistant_id=assistant_id,
+                 vector_store_ids=vector_store_ids
+             )
+             await bridge.initialize(workato_config=WORKATO_CONFIG)
+             
+             # Store the bridge instance
+             active_connections[connection_id] = bridge
+             
+             # Notify client that the assistant is ready
+             await websocket.send_json({
+                 "type": "ready",
+                 "message": "Assistant initialized successfully"
+             })
+             
+             # Process messages
+             while True:
+                 # Wait for a message from the client
+                 message_json = await websocket.receive_text()
+                 message_data = json.loads(message_json)
+                 
+                 # Process commands
+                 if message_data.get("type") == "command":
+                     command = message_data.get("command")
+                     
+                     if command == "clear_history":
+@@ -190,26 +200,26 @@ async def websocket_endpoint(websocket: WebSocket):
+     
+     except WebSocketDisconnect:
+         logger.info(f"Client disconnected: {connection_id}")
+         # Clean up resources
+         if connection_id in active_connections:
+             del active_connections[connection_id]
+     
+     except Exception as e:
+         logger.error(f"Error in WebSocket connection: {str(e)}")
+         try:
+             await websocket.send_json({
+                 "type": "error",
+                 "error": f"Unexpected error: {str(e)}"
+             })
+         except:
+             pass
+         
+         # Clean up resources
+         if connection_id in active_connections:
+             del active_connections[connection_id]
+ 
+ @app.on_event("shutdown")
+ async def shutdown_event():
+     """Clean up resources on application shutdown."""
+     logger.info("Application shutting down, cleaning up resources")
+-    active_connections.clear() 
+\ No newline at end of file
++    active_connections.clear() 
+diff --git a/app/api/websocket_server.py b/app/api/websocket_server.py
+index 1ec0d6f8316db69e6cc7adc5b43e75a87d313065..562ea7ae54c3a6bfa6ebbcc82e3d473657fe9b19 100644
+--- a/app/api/websocket_server.py
++++ b/app/api/websocket_server.py
+@@ -1,119 +1,128 @@
+ # Remove any imports like:
+ # from app.services.agent_services.direct_bridge import DirectAssistantBridge
+ # Remove any code that uses the DirectAssistantBridge class 
+ 
+ # Replace any code that might be choosing between bridges:
+ # bridge = DirectAssistantBridge(...) if use_direct_api else AssistantBridge(...)
+ # With:
+ bridge = AssistantBridge(...) 
+ 
+ import asyncio
+ import json
+ import logging
+ import uuid
+ from typing import Dict, List, Optional, Any
+ 
+ from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends, HTTPException, Header
+ from fastapi.middleware.cors import CORSMiddleware
+ from pydantic import BaseModel
+ 
+ # Import your existing services
+ from app.services.assistant_bridge import AssistantBridge
+ from app.services.workato_integration import WorkatoConfig
++from services.service_db import DBService
+ 
+ # Set up logging
+ logging.basicConfig(level=logging.INFO)
+ logger = logging.getLogger(__name__)
+ 
+ # Standard Workato configuration (you might want to load this from environment variables)
+ WORKATO_CONFIG = WorkatoConfig(
+     api_token="ad19767e318455a1daa7635b3e5f3ce4055f11376155b45c506ceb4f4f739d1c",
+     endpoint_url="https://apim.workato.com/solconsult/assistant-tools-v1/workato-root-tool"
+ )
+ 
+ # Create FastAPI app
+ app = FastAPI(title="OpenAI Agents WebSocket API")
+ 
+ # Add CORS middleware
+ app.add_middleware(
+     CORSMiddleware,
+     allow_origins=["*"],  # For production, specify actual origins
+     allow_credentials=True,
+     allow_methods=["*"],
+     allow_headers=["*"],
+ )
+ 
+ # Models for connection parameters
+ class ConnectionParams(BaseModel):
+-    api_key: str
+-    assistant_id: str
++    solomon_consumer_key: str
+     vector_store_ids: Optional[List[str]] = None
+     thread_id: Optional[str] = None  # Add thread_id to support conversation persistence
+ 
+ # Store active connections and their associated thread IDs
+ active_connections: Dict[str, AssistantBridge] = {}
+ thread_connections: Dict[str, str] = {}  # Maps thread_ids to connection_ids
+ 
+ # Authentication dependency
+ async def get_api_key(x_api_key: str = Header(None)):
+     if not x_api_key:
+         raise HTTPException(status_code=401, detail="API key is required")
+     # In production, you would validate the API key against your database
+     return x_api_key
+ 
+-@app.websocket("/ws")
+-async def websocket_endpoint(websocket: WebSocket):
++@app.websocket("/ws/assistant/{assistant_id}")
++async def websocket_endpoint(websocket: WebSocket, assistant_id: str):
+     """WebSocket endpoint for real-time chat with the assistant."""
+     await websocket.accept()
+     connection_id = str(uuid.uuid4())
+     
+     try:
+         # Wait for connection parameters
+         logger.info(f"New connection {connection_id} established, waiting for parameters")
+         params_json = await websocket.receive_text()
+         params = json.loads(params_json)
+-        
++
+         # Validate required parameters
+-        if not params.get("api_key") or not params.get("assistant_id"):
++        if not params.get("solomon_consumer_key"):
+             await websocket.send_json({
+                 "type": "error",
+-                "error": "Missing required parameters: api_key and assistant_id are required"
++                "error": "Missing required parameters: solomon_consumer_key is required"
+             })
+             await websocket.close()
+             return
+         
+         # Initialize the assistant bridge
+         logger.info(f"Initializing AssistantBridge for connection {connection_id}")
+-        api_key = params.get("api_key")
+-        assistant_id = params.get("assistant_id")
++        solomon_consumer_key = params.get("solomon_consumer_key")
+         vector_store_ids = params.get("vector_store_ids")
++
++        # Retrieve OpenAI API key using DBService
++        openai_api_key = await DBService.get_openai_api_key(solomon_consumer_key)
++        if not openai_api_key:
++            await websocket.send_json({
++                "type": "error",
++                "error": "Invalid Solomon Consumer Key"
++            })
++            await websocket.close()
++            return
+         thread_id = params.get("thread_id")  # Get thread_id if provided
+-        
++
+         try:
+             bridge = AssistantBridge(
+-                api_key=api_key,
++                api_key=openai_api_key,
+                 assistant_id=assistant_id,
+                 vector_store_ids=vector_store_ids
+             )
+             await bridge.initialize(workato_config=WORKATO_CONFIG)
+             
+             # If thread_id is provided, restore the conversation state
+             if thread_id:
+                 bridge.session_memory.set_thread_id(thread_id)
+                 # Load any existing conversation history for this thread
+                 # (assuming you have implemented this in your storage layer)
+             else:
+                 # Generate new thread_id for new conversations
+                 thread_id = str(uuid.uuid4())
+                 bridge.session_memory.set_thread_id(thread_id)
+             
+             # Store the bridge instance and thread mapping
+             active_connections[connection_id] = bridge
+             thread_connections[thread_id] = connection_id
+             
+             # Notify client that the assistant is ready
+             await websocket.send_json({
+                 "type": "ready",
+                 "message": "Assistant initialized successfully",
+                 "thread_id": thread_id
+             })
+@@ -134,118 +143,114 @@ async def websocket_endpoint(websocket: WebSocket):
+                             "type": "system",
+                             "message": "Conversation history cleared"
+                         })
+                         continue
+                     
+                     elif command == "get_history":
+                         history = bridge.get_conversation_history()
+                         await websocket.send_json({
+                             "type": "history",
+                             "history": history
+                         })
+                         continue
+                 
+                 # Process chat messages
+                 if message_data.get("type") == "message":
+                     user_input = message_data.get("content", "")
+                     if not user_input.strip():
+                         continue
+                     
+                     # Send acknowledgment
+                     await websocket.send_json({
+                         "type": "system",
+                         "message": "Processing your message..."
+                     })
+                     
+-                    # Add any context from the client
+-                    context = message_data.get("context", {})
+-                    context["thread_id"] = thread_id
+-                    
+                     # Handle streaming response
+                     if message_data.get("stream", True):
+                         try:
+                             # Send response in chunks
+                             tool_used = False
+                             full_response = ""
+                             
+-                            async for chunk, event_type in bridge.chat_streaming(user_input, context):
++                            async for chunk, event_type in bridge.chat_streaming(user_input):
+                                 if event_type == "raw_response" or event_type == "message":
+                                     # Text content
+                                     await websocket.send_json({
+                                         "type": "stream",
+                                         "content": chunk,
+                                         "event_type": event_type
+                                     })
+                                     full_response += chunk
+                                 elif event_type == "tool_call":
+                                     # Tool call event
+                                     tool_used = True
+                                     await websocket.send_json({
+                                         "type": "tool",
+                                         "tool": "call",
+                                         "name": chunk
+                                     })
+                                 elif event_type == "tool_output":
+                                     # Tool output event
+                                     await websocket.send_json({
+                                         "type": "tool",
+                                         "tool": "output",
+                                         "content": chunk
+                                     })
+                             
+                             # Send completion message
+                             await websocket.send_json({
+                                 "type": "completion",
+                                 "content": full_response,
+                                 "tool_used": tool_used,
+                                 "thread_id": thread_id
+                             })
+                             
+                         except Exception as e:
+                             logger.error(f"Error during streaming: {str(e)}")
+                             await websocket.send_json({
+                                 "type": "error",
+                                 "error": f"Error during response streaming: {str(e)}"
+                             })
+                     else:
+                         # Handle non-streaming response
+                         try:
+-                            response = await bridge.chat(user_input, context)
++                            response = await bridge.chat(user_input)
+                             await websocket.send_json({
+                                 "type": "response",
+                                 "content": response,
+                                 "thread_id": thread_id
+                             })
+                         except Exception as e:
+                             logger.error(f"Error during chat: {str(e)}")
+                             await websocket.send_json({
+                                 "type": "error",
+                                 "error": f"Error processing message: {str(e)}"
+                             })
+                 
+         except Exception as e:
+             logger.error(f"Error initializing bridge: {str(e)}")
+             await websocket.send_json({
+                 "type": "error",
+                 "error": f"Error initializing assistant: {str(e)}"
+             })
+             await websocket.close()
+             return
+     
+     except WebSocketDisconnect:
+         logger.info(f"Client disconnected: {connection_id}")
+     except Exception as e:
+         logger.error(f"Error in websocket connection: {str(e)}")
+     finally:
+         # Clean up connection
+         if connection_id in active_connections:
+             bridge = active_connections[connection_id]
+             thread_id = bridge.session_memory.get_thread_id()
+             if thread_id:
+                 thread_connections.pop(thread_id, None)
+             active_connections.pop(connection_id)
+ 
+ @app.on_event("shutdown")
+ async def shutdown_event():
+     """Clean up resources on shutdown."""
+     active_connections.clear()
+-    thread_connections.clear() 
+\ No newline at end of file
++    thread_connections.clear() 
+diff --git a/app/main.py b/app/main.py
+index 5cc9ebbffc48db8abd1885f9d7be411979eabbc3..fef004bfe2cc02b25b484109821fa1fafdba66b4 100644
+--- a/app/main.py
++++ b/app/main.py
+@@ -1,40 +1,41 @@
+ import sys
+ import os
+ import json
+ from pathlib import Path
+ from typing import List, Dict, Any
+ from fastapi import FastAPI, HTTPException, Depends, WebSocket, WebSocketDisconnect
+ from fastapi.middleware.cors import CORSMiddleware
+ from fastapi.openapi.utils import get_openapi
+ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+ from router import router
+ from routers.healthcheck import router_health_check
+ from fastapi.responses import Response
+ import yaml
+ import functools
+ import logging
++from services.service_db import DBService
+ 
+ # Add the parent directory to sys.path to make 'tools' module discoverable
+ sys.path.append(str(Path(__file__).parent.parent))
+ 
+ # Set up logging
+ logging.basicConfig(level=logging.INFO)
+ logger = logging.getLogger(__name__)
+ 
+ # Initialize the FastAPI application
+ app = FastAPI(title="OpenAPI Assistants V2.0", version="0.1.0")
+ 
+ # Add CORS middleware
+ app.add_middleware(
+     CORSMiddleware,
+     allow_origins=["*"],  # Adjust as needed for production
+     allow_credentials=True,
+     allow_methods=["*"],
+     allow_headers=["*"],
+ )
+ 
+ # Include routers
+ app.include_router(router_health_check)
+ app.include_router(router)
+ 
+ # WebSocket connection manager
+@@ -67,64 +68,73 @@ manager = ConnectionManager()
+ 
+ # WebSocket endpoint for assistant chat
+ @app.websocket("/ws/assistant/{assistant_id}")
+ async def websocket_endpoint(websocket: WebSocket, assistant_id: str):
+     await manager.connect(websocket)
+     try:
+         # Send welcome message
+         await manager.send_json({
+             "type": "connection_established",
+             "data": {
+                 "assistant_id": assistant_id,
+                 "message": "Connected to the assistant service"
+             }
+         }, websocket)
+         
+         from app.services.assistant_bridge import AssistantBridge, StreamEvent
+         
+         # Maintain the bridge instance for this connection
+         bridge = None
+         
+         while True:
+             data = await websocket.receive_json()
+             
+             # Handle different message types
+             if data.get("type") == "initialize":
+-                # Initialize the assistant bridge
+-                api_key = data.get("api_key")
++                # Initialize the assistant bridge using Solomon Consumer Key
++                solomon_consumer_key = data.get("solomon_consumer_key")
+                 vector_store_ids = data.get("vector_store_ids", [])
+-                
+-                if not api_key:
++
++                if not solomon_consumer_key:
+                     await manager.send_json({
+                         "type": "error",
+-                        "data": {"message": "API key is required for initialization"}
++                        "data": {"message": "Solomon Consumer Key is required for initialization"}
+                     }, websocket)
+                     continue
+-                
++
++                # Fetch the OpenAI API key from the database
++                openai_api_key = await DBService.get_openai_api_key(solomon_consumer_key)
++                if not openai_api_key:
++                    await manager.send_json({
++                        "type": "error",
++                        "data": {"message": "Invalid Solomon Consumer Key"}
++                    }, websocket)
++                    continue
++
+                 try:
+                     bridge = AssistantBridge(
+-                        api_key=api_key,
++                        api_key=openai_api_key,
+                         assistant_id=assistant_id,
+                         vector_store_ids=vector_store_ids
+                     )
+                     await bridge.initialize()
+                     
+                     await manager.send_json({
+                         "type": "initialized",
+                         "data": {"message": "Assistant bridge initialized successfully"}
+                     }, websocket)
+                 except Exception as e:
+                     await manager.send_json({
+                         "type": "error",
+                         "data": {"message": f"Initialization error: {str(e)}"}
+                     }, websocket)
+             
+             elif data.get("type") == "chat_message":
+                 # Process a chat message
+                 if not bridge:
+                     await manager.send_json({
+                         "type": "error",
+                         "data": {"message": "Bridge not initialized. Send an initialize message first."}
+                     }, websocket)
+                     continue
+                 
+                 message = data.get("message", "")
+@@ -221,26 +231,26 @@ def custom_openapi():
+     openapi_schema["security"] = [{"BearerAuth": []}]
+     app.openapi_schema = openapi_schema
+     return app.openapi_schema
+ 
+ app.openapi = custom_openapi
+ 
+ @app.get("/openapi.yaml")
+ @functools.lru_cache()
+ def get_openapi_yaml() -> Response:
+     openapi_json = app.openapi()  # Get the OpenAPI JSON spec
+     yaml_output = yaml.dump(openapi_json)  # Convert JSON to YAML
+     return Response(content=yaml_output, media_type="text/x-yaml")
+ 
+ # Debug middleware to log requests
+ @app.middleware("http")
+ async def log_requests(request, call_next):
+     print(f"Received request: {request.method} {request.url}")
+     print("Headers:")
+     for name, value in request.headers.items():
+         print(f"{name}: {value}")
+     response = await call_next(request)
+     return response
+ 
+ if __name__ == "__main__":
+     import uvicorn
+-    uvicorn.run(app, host="0.0.0.0", port=8080)
+\ No newline at end of file
++    uvicorn.run(app, host="0.0.0.0", port=8080)
+diff --git a/app/run_server.py b/app/run_server.py
+index bd67dec2bf4b0e11418748ff885f4d48e4e054bb..93256511072acd7fc8715d4cc1566060fc532a52 100644
+--- a/app/run_server.py
++++ b/app/run_server.py
+@@ -7,26 +7,26 @@ def main():
+     parser = argparse.ArgumentParser(description="Start the WebSocket server for OpenAI Agents")
+     parser.add_argument("--host", default="0.0.0.0", help="Host to bind the server to")
+     parser.add_argument("--port", type=int, default=8000, help="Port to bind the server to")
+     parser.add_argument("--reload", action="store_true", help="Enable auto-reload for development")
+     
+     args = parser.parse_args()
+     
+     print(f"Starting WebSocket server on {args.host}:{args.port}")
+     
+     # Determine the correct path to the websocket server
+     if os.path.exists(os.path.join(os.path.dirname(__file__), "api", "websocket", "websocket_server.py")):
+         server_path = "app.api.websocket.websocket_server:app"
+     else:
+         server_path = "app.api.websocket_server:app"
+     
+     print(f"Using server path: {server_path}")
+     
+     uvicorn.run(
+         server_path, 
+         host=args.host, 
+         port=args.port,
+         reload=args.reload
+     )
+ 
+ if __name__ == "__main__":
+-    main() 
+\ No newline at end of file
++    main() 
+diff --git a/app/services/service_db.py b/app/services/service_db.py
+index 5d24bf6a57ceed7f9c11926d9c7c5ced079d132a..9234705915e875ca0c5d47744b120b7b01a92617 100644
+--- a/app/services/service_db.py
++++ b/app/services/service_db.py
+@@ -23,60 +23,59 @@ class DBService:
+             else:
+                 logging.warning(f"No OpenAI API key found for Solomon Consumer Key: {solomon_consumer_key}")
+                 return None
+         except SQLAlchemyError as e:
+             logging.error(f"Database error in get_openai_api_key: {str(e)}")
+             raise Exception(f"Database error: {str(e)}")
+ 
+     @staticmethod
+     async def get_consumer_info(solomon_consumer_key: str) -> dict:
+         db_connector = DatabaseConnector()
+         try:
+             query = """
+                 SELECT TOP 1 
+                     solomon_consumer_key,
+                     customer_name,
+                     aws_key,
+                     create_date,
+                     modified_on,
+                     plan_level,
+                     customer_email,
+                     openai_api_key
+                 FROM dbo.solConnectConsumers 
+                 WHERE solomon_consumer_key = :solomon_consumer_key
+             """
+             result = db_connector.execute_query(query, {"solomon_consumer_key": solomon_consumer_key})
+-            print(result[0][7])
+             if result and result[0]:
+                 return {
+                     "solomon_consumer_key": result[0][0],
+                     "customer_name": result[0][1],
+                     "aws_key": result[0][2],
+                     "create_date": result[0][3],
+                     "modified_on": result[0][4],
+                     "plan_level": result[0][5],
+                     "customer_email": result[0][6],
+                     "openai_api_key": result[0][7]
+                 }
+             else:
+                 logging.warning(f"No consumer info found for Solomon Consumer Key: {solomon_consumer_key}")
+                 return None
+         except SQLAlchemyError as e:
+             logging.error(f"Database error in get_consumer_info: {str(e)}")
+             raise Exception(f"Database error: {str(e)}")
+ 
+     @staticmethod
+     async def get_workspace_names_by_email(email: str) -> list[str]:
+         db_connector = DatabaseConnector()
+         try:
+             query = """
+                 SELECT workspace_name
+                 FROM dbo.solConnectUsers 
+                 WHERE customer_email = :email
+             """
+             result = db_connector.execute_query(query, {"email": email})
+             if result:
+                 return [row[0] for row in result]  # Just return the workspace names
+             return []
+         except SQLAlchemyError as e:
+             logging.error(f"Database error in get_workspace_names_by_email: {str(e)}")
+-            raise Exception(f"Database error: {str(e)}")
+\ No newline at end of file
++            raise Exception(f"Database error: {str(e)}")
+diff --git a/requirements-minimal.txt b/requirements-minimal.txt
+index fa02d50bbb477458d161699ee962b6dc587a9f4a..d7e626a6bd22698f14565ff2d885601adc60055f 100644
+--- a/requirements-minimal.txt
++++ b/requirements-minimal.txt
+@@ -1,19 +1,17 @@
+ # Core dependencies only - let pip resolve versions
+ fastapi
+ uvicorn[standard]
+ openai>=1.6.0
+ pydantic>=2.0.0
+ python-dotenv
+ langchain
+ websockets
+ psycopg2-binary
+ python-jose[cryptography]
+ passlib[bcrypt]
+-aiohttp 
++aiohttp
+ python-multipart
+-python-dotenv
+ openai-agents
+-aiohttp
+ boto3
+ jwt
+-pyodbc
+\ No newline at end of file
++pyodbc
+diff --git a/tests/test_websocket_client.py b/tests/test_websocket_client.py
+index c2bf4aef302fb4088b15b9a2b68b7441ddb90ff7..3b2853c469cd8fdcfce0218774ac90df5450d223 100644
+--- a/tests/test_websocket_client.py
++++ b/tests/test_websocket_client.py
+@@ -1,48 +1,47 @@
+ #!/usr/bin/env python
+ import asyncio
+ import websockets
+ import json
+ import sys
+ import argparse
+ import logging
+ import os
+ 
+ # Configure logging
+ logging.basicConfig(level=logging.INFO)
+ logger = logging.getLogger(__name__)
+ 
+-async def test_websocket_client(api_key, assistant_id, vector_store_ids=None):
++async def test_websocket_client(solomon_consumer_key, assistant_id, vector_store_ids=None):
+     """Test the WebSocket API with streaming responses."""
+-    uri = "ws://localhost:8000/ws"
++    uri = f"ws://localhost:8000/ws/assistant/{assistant_id}"
+     print(f"Connecting to {uri}...")
+     
+     async with websockets.connect(uri) as websocket:
+         # Send connection parameters
+         await websocket.send(json.dumps({
+-            "api_key": api_key,
+-            "assistant_id": assistant_id,
++            "solomon_consumer_key": solomon_consumer_key,
+             "vector_store_ids": vector_store_ids
+         }))
+         
+         # Wait for ready message
+         response = await websocket.recv()
+         response_data = json.loads(response)
+         print(f"Server: {response}")
+         
+         if response_data.get("type") == "error":
+             print(f"Error: {response_data.get('error')}")
+             return
+         
+         # Start interactive mode
+         print("\n=== Interactive WebSocket Test ===")
+         print("Type your messages, or 'exit' to quit")
+         
+         while True:
+             # Get user input
+             user_input = input("You: ")
+             
+             if user_input.lower() == "exit":
+                 break
+             
+             # Send message to server
+             await websocket.send(json.dumps({
+@@ -71,40 +70,40 @@ async def test_websocket_client(api_key, assistant_id, vector_store_ids=None):
+                         elif response_data.get("tool") == "output":
+                             print(f"\n[Tool output: {response_data.get('content', '')}]", end="", flush=True)
+                     elif response_data.get("type") == "completion":
+                         # Stream complete
+                         print()  # Add newline
+                         break
+                     elif response_data.get("type") == "error":
+                         # Error occurred
+                         print(f"\nError: {response_data.get('error')}")
+                         break
+                     elif response_data.get("type") == "system":
+                         # System message
+                         if "Processing" not in response_data.get("message", ""):
+                             print(f"\nSystem: {response_data.get('message')}")
+                     elif response_data.get("type") == "response":
+                         # Non-streaming response
+                         print(response_data.get("content", ""))
+                         break
+                 except Exception as e:
+                     logger.error(f"Error in WebSocket communication: {str(e)}")
+                     print(f"\nConnection error: {str(e)}")
+                     return
+ 
+ def main():
+     parser = argparse.ArgumentParser(description="Test the WebSocket API")
+-    parser.add_argument("api_key", help="OpenAI API key")
++    parser.add_argument("solomon_consumer_key", help="Solomon Consumer Key")
+     parser.add_argument("assistant_id", help="OpenAI Assistant ID")
+     parser.add_argument("--vector-stores", nargs="+", help="Vector store IDs for file search")
+     
+     args = parser.parse_args()
+     
+     try:
+-        asyncio.run(test_websocket_client(args.api_key, args.assistant_id, args.vector_stores))
++        asyncio.run(test_websocket_client(args.solomon_consumer_key, args.assistant_id, args.vector_stores))
+     except KeyboardInterrupt:
+         print("\nTest terminated by user")
+     except Exception as e:
+         print(f"Error: {str(e)}")
+ 
+ if __name__ == "__main__":
+-    main() 
+\ No newline at end of file
++    main() 
+diff --git a/websocket_test.html b/websocket_test.html
+index 0628488917ed737c10a10cc7dc7708f74aeaeddc..fae10095b429c56eb34984b66a3083461fb07e98 100644
+--- a/websocket_test.html
++++ b/websocket_test.html
+@@ -64,52 +64,52 @@
+             color: #cc0000;
+         }
+     </style>
+ </head>
+ <body>
+     <h1>WebSocket Test Client</h1>
+     <div class="status disconnected" id="connectionStatus">Disconnected</div>
+     
+     <div class="container">
+         <div class="input-group">
+             <label for="serverUrl">WebSocket URL:</label>
+             <input type="text" id="serverUrl" value="ws://localhost:8080/ws/assistant/">
+         </div>
+         
+         <div class="input-group">
+             <label for="assistantId">Assistant ID:</label>
+             <input type="text" id="assistantId" value="test-assistant-123">
+         </div>
+         
+         <div class="button-group">
+             <button onclick="connectWebSocket()">Connect</button>
+             <button onclick="disconnectWebSocket()">Disconnect</button>
+         </div>
+         
+         <div class="input-group">
+-            <label for="apiKey">API Key:</label>
+-            <input type="text" id="apiKey" value="">
++            <label for="solomonConsumerKey">Solomon Consumer Key:</label>
++            <input type="text" id="solomonConsumerKey" value="">
+             <button onclick="initialize()">Initialize Assistant</button>
+         </div>
+         
+         <div class="input-group">
+             <label for="message">Message:</label>
+             <input type="text" id="message" value="Hello, how can you help me today?">
+             <button onclick="sendMessage()">Send Message</button>
+         </div>
+         
+         <button onclick="clearHistory()">Clear Conversation History</button>
+         
+         <div class="input-group">
+             <button onclick="clearLog()">Clear Log</button>
+         </div>
+         
+         <h3>Message Log:</h3>
+         <pre id="messageLog"></pre>
+     </div>
+ 
+     <script>
+         let socket = null;
+         
+         function connectWebSocket() {
+             if (socket && socket.readyState === WebSocket.OPEN) {
+                 appendLog("Already connected", "error");
+@@ -152,59 +152,59 @@
+                 socket.onerror = function(error) {
+                     appendLog(`WebSocket Error: ${error.message || "Unknown error"}`, "error");
+                 };
+                 
+             } catch (error) {
+                 appendLog(`Failed to connect: ${error.message}`, "error");
+             }
+         }
+         
+         function disconnectWebSocket() {
+             if (!socket) {
+                 appendLog("Not connected", "error");
+                 return;
+             }
+             
+             socket.close();
+             socket = null;
+         }
+         
+         function initialize() {
+             if (!socket || socket.readyState !== WebSocket.OPEN) {
+                 appendLog("Not connected to WebSocket", "error");
+                 return;
+             }
+             
+-            const apiKey = document.getElementById('apiKey').value.trim();
++            const apiKey = document.getElementById('solomonConsumerKey').value.trim();
+             if (!apiKey) {
+-                appendLog("API Key is required", "error");
++                appendLog("Solomon Consumer Key is required", "error");
+                 return;
+             }
+             
+             const data = {
+                 type: "initialize",
+-                api_key: apiKey,
++                solomon_consumer_key: apiKey,
+                 vector_store_ids: []
+             };
+             
+             sendData(data);
+         }
+         
+         function sendMessage() {
+             if (!socket || socket.readyState !== WebSocket.OPEN) {
+                 appendLog("Not connected to WebSocket", "error");
+                 return;
+             }
+             
+             const message = document.getElementById('message').value;
+             if (!message) {
+                 appendLog("Message is empty", "error");
+                 return;
+             }
+             
+             const data = {
+                 type: "chat_message",
+                 message: message
+             };
+             
+             sendData(data);
+         }
+@@ -229,26 +229,26 @@
+                 appendLog(`Sent: ${JSON.stringify(data, null, 2)}`, "sent");
+             } catch (error) {
+                 appendLog(`Error sending data: ${error.message}`, "error");
+             }
+         }
+         
+         function appendLog(message, type = "info") {
+             const log = document.getElementById('messageLog');
+             const entry = document.createElement('div');
+             entry.className = `message ${type}`;
+             
+             // Format the timestamp
+             const now = new Date();
+             const timestamp = `[${now.toLocaleTimeString()}]`;
+             
+             entry.textContent = `${timestamp} ${message}`;
+             log.appendChild(entry);
+             log.scrollTop = log.scrollHeight;
+         }
+         
+         function clearLog() {
+             document.getElementById('messageLog').innerHTML = '';
+         }
+     </script>
+ </body>
+-</html>
+\ No newline at end of file
++</html>
