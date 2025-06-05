@@ -198,13 +198,13 @@ async def websocket_endpoint(websocket: WebSocket):
             })
             await websocket.close()
             return
-    
+
     except WebSocketDisconnect:
         logger.info(f"Client disconnected: {connection_id}")
         # Clean up resources
         if connection_id in active_connections:
             del active_connections[connection_id]
-    
+
     except Exception as e:
         logger.error(f"Error in WebSocket connection: {str(e)}")
         try:
@@ -214,7 +214,7 @@ async def websocket_endpoint(websocket: WebSocket):
             })
         except:
             pass
-        
+
         # Clean up resources
         if connection_id in active_connections:
             del active_connections[connection_id]
@@ -223,4 +223,4 @@ async def websocket_endpoint(websocket: WebSocket):
 async def shutdown_event():
     """Clean up resources on application shutdown."""
     logger.info("Application shutting down, cleaning up resources")
-    active_connections.clear() 
+    active_connections.clear()

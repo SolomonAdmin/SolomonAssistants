@@ -9,11 +9,9 @@ websockets
 psycopg2-binary
 python-jose[cryptography]
 passlib[bcrypt]
-aiohttp 
-python-multipart
-python-dotenv
-openai-agents
 aiohttp
+python-multipart
+openai-agents
 boto3
 jwt
 pyodbc

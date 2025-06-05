@@ -146,7 +146,7 @@ async def websocket_endpoint(websocket: WebSocket):
                             "message": "Conversation history cleared"
                         })
                         continue
-                    
+
                     elif command == "get_history":
                         history = bridge.get_conversation_history()
                         await websocket.send_json({
@@ -154,31 +154,27 @@ async def websocket_endpoint(websocket: WebSocket):
                             "history": history
                         })
                         continue
-                
+
                 # Process chat messages
                 if message_data.get("type") == "message":
                     user_input = message_data.get("content", "")
                     if not user_input.strip():
                         continue
-                    
+
                     # Send acknowledgment
                     await websocket.send_json({
                         "type": "system",
                         "message": "Processing your message..."
                     })
-                    
-                    # Add any context from the client
-                    context = message_data.get("context", {})
-                    context["thread_id"] = thread_id
-                    
+
                     # Handle streaming response
                     if message_data.get("stream", True):
                         try:
                             # Send response in chunks
                             tool_used = False
                             full_response = ""
-                            
-                            async for chunk, event_type in bridge.chat_streaming(user_input, context):
+
+                            async for chunk, event_type in bridge.chat_streaming(user_input):
                                 if event_type == "raw_response" or event_type == "message":
                                     # Text content
                                     await websocket.send_json({
@@ -202,7 +198,7 @@ async def websocket_endpoint(websocket: WebSocket):
                                         "tool": "output",
                                         "content": chunk
                                     })
-                            
+
                             # Send completion message
                             await websocket.send_json({
                                 "type": "completion",
@@ -210,7 +206,7 @@ async def websocket_endpoint(websocket: WebSocket):
                                 "tool_used": tool_used,
                                 "thread_id": thread_id
                             })
-                            
+
                         except Exception as e:
                             logger.error(f"Error during streaming: {str(e)}")
                             await websocket.send_json({
@@ -220,7 +216,7 @@ async def websocket_endpoint(websocket: WebSocket):
                     else:
                         # Handle non-streaming response
                         try:
-                            response = await bridge.chat(user_input, context)
+                            response = await bridge.chat(user_input)
                             await websocket.send_json({
                                 "type": "response",
                                 "content": response,
@@ -232,7 +228,7 @@ async def websocket_endpoint(websocket: WebSocket):
                                 "type": "error",
                                 "error": f"Error processing message: {str(e)}"
                             })
-                
+
         except Exception as e:
             logger.error(f"Error initializing bridge: {str(e)}")
             await websocket.send_json({
@@ -241,7 +237,7 @@ async def websocket_endpoint(websocket: WebSocket):
             })
             await websocket.close()
             return
-    
+
     except WebSocketDisconnect:
         logger.info(f"Client disconnected: {connection_id}")
     except Exception as e:
@@ -259,4 +255,4 @@ async def websocket_endpoint(websocket: WebSocket):
 async def shutdown_event():
     """Clean up resources on shutdown."""
     active_connections.clear()
-    thread_connections.clear() 
+    thread_connections.clear()
