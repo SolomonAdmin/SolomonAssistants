@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from router import router
+from routers.router_completions import router_completions
 from routers.healthcheck import router_health_check
 from fastapi.responses import Response
 import yaml
@@ -37,6 +38,7 @@ app.add_middleware(
 # Include routers
 app.include_router(router_health_check)
 app.include_router(router)
+app.include_router(router_completions)
 
 # WebSocket connection manager
 class ConnectionManager:
