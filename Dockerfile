@@ -1,50 +1,44 @@
-# Use an official Python runtime as a base image with explicit platform specification
+# Use an official Python 3.9 base image (amd64 architecture for compatibility)
 FROM --platform=linux/amd64 python:3.9-slim-bullseye
 
-# Set the working directory in the container
 WORKDIR /app
 
-# Install system dependencies including ODBC libraries
+# Install system dependencies including ODBC libraries and build tools
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-    unixodbc \
-    unixodbc-dev \
-    gnupg \
-    curl && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+    unixodbc unixodbc-dev \ 
+    gnupg curl build-essential && \ 
+    apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Install Microsoft ODBC driver
+# Add Microsoft SQL Server ODBC driver repository and install the ODBC Driver 17
 RUN curl https://packages.microsoft.com/keys/microsoft.asc | apt-key add - && \
     curl https://packages.microsoft.com/config/debian/11/prod.list > /etc/apt/sources.list.d/mssql-release.list && \
     apt-get update && \
     ACCEPT_EULA=Y apt-get install -y msodbcsql17 && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+    apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Add this to your Dockerfile
+# Install any additional libraries needed by the ODBC driver (e.g., Kerberos support)
 RUN apt-get update && apt-get install -y libgssapi-krb5-2 && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+    apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements file
+# Copy dependency definitions
 COPY requirements-minimal.txt /app/
 COPY constraints.txt /app/
 
-# Install dependencies - simpler approach
+# Install Python dependencies
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements-minimal.txt
 
-# Copy the application and other necessary files
+# Copy the application code into the image
 COPY ./app /app/app
 COPY ./helpers /app/helpers
 COPY ./config.py /app/
 
-# Make port 80 available to the world outside this container
-EXPOSE 80
-
-# Define environment variable
+# Set PYTHONPATH so the app package is recognized
 ENV PYTHONPATH="/app:/app/app"
 
-# Run the application
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "80"]
+# Expose the application port (Render will port-map this if needed)
+EXPOSE 80
+
+# Start the FastAPI application with Uvicorn, using Render's PORT if available
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-80}"]
