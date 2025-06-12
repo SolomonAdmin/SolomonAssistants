@@ -70,7 +70,7 @@ packaging==24.1
 pandas==2.2.2
 peewee==3.17.5
 platformdirs==4.2.2
-pydantic==2.7.4
+pydantic==2.10.4
 pydantic-settings==2.3.3
 pydantic_core==2.18.4
 Pygments==2.18.0
